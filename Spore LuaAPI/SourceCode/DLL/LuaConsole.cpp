@@ -3,7 +3,7 @@
 #ifdef LUAAPI_DLL_EXPORT
 
 #include "LuaConsole.h"
-#include "LuaSpore.h"
+#include <LuaSpore/LuaSpore.h>
 
 using namespace LuaConsole;
 

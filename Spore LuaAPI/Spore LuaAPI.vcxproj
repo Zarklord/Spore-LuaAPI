@@ -125,7 +125,7 @@
       <LanguageStandard>stdcpp17</LanguageStandard>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <PrecompiledHeaderOutputFile>$(IntDir)$(TargetName).pch</PrecompiledHeaderOutputFile>
-      <AdditionalIncludeDirectories>$(ProjectDir)SourceCode\;$(ProjectDir)SourceCode\DLL\;$(ProjectDir)LuaSpore\</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)SourceCode\DLL\</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -145,7 +145,7 @@
       <UndefinePreprocessorDefinitions>
       </UndefinePreprocessorDefinitions>
       <PrecompiledHeaderOutputFile>$(IntDir)$(TargetName).pch</PrecompiledHeaderOutputFile>
-      <AdditionalIncludeDirectories>$(ProjectDir)SourceCode\;$(ProjectDir)SourceCode\DLL\;$(ProjectDir)LuaSpore\</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)SourceCode\DLL\</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -165,7 +165,7 @@
       <LanguageStandard>stdcpp17</LanguageStandard>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <PrecompiledHeaderOutputFile>$(IntDir)$(TargetName).pch</PrecompiledHeaderOutputFile>
-      <AdditionalIncludeDirectories>$(ProjectDir)SourceCode\;$(ProjectDir)SourceCode\DLL\;$(ProjectDir)LuaSpore\</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)SourceCode\DLL\</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -187,7 +187,7 @@
       <LanguageStandard>stdcpp17</LanguageStandard>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <PrecompiledHeaderOutputFile>$(IntDir)$(TargetName).pch</PrecompiledHeaderOutputFile>
-      <AdditionalIncludeDirectories>$(ProjectDir)SourceCode\;$(ProjectDir)SourceCode\DLL\;$(ProjectDir)LuaSpore\</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)SourceCode\DLL\</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -201,8 +201,9 @@
     <None Include="SdkPathConfig.props" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="SourceCode\Console\LuaConsole.cpp" />
+    <ClCompile Include="SourceCode\Bindings\PropManagerReg.cpp" />
     <ClCompile Include="SourceCode\DLL\dllmain.cpp" />
+    <ClCompile Include="SourceCode\DLL\LuaConsole.cpp" />
     <ClCompile Include="SourceCode\DLL\pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
@@ -213,9 +214,12 @@
     <ClCompile Include="SourceCode\LuaSpore.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="LuaSpore\DefaultIncludes.h" />
     <ClInclude Include="LuaSpore\LuaInternal.h" />
     <ClInclude Include="LuaSpore\LuaSpore.h" />
-    <ClInclude Include="SourceCode\Console\LuaConsole.h" />
+    <ClInclude Include="LuaSpore\LuaUtil.h" />
+    <ClInclude Include="LuaSpore\Lunar.h" />
+    <ClInclude Include="SourceCode\DLL\LuaConsole.h" />
     <ClInclude Include="SourceCode\DLL\pch.h" />
     <ClInclude Include="SourceCode\DLL\targetver.h" />
   </ItemGroup>

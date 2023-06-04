@@ -1,40 +1,37 @@
 #pragma once
 
-extern "C" {
-#include <lua.h>
-#include <lualib.h>
-#include <lauxlib.h>
-}
+#include <LuaSpore\LuaInternal.h>
 
-class LuaSpore : public DefaultRefCounted, public App::IUpdatable
+class LUAAPI LuaSpore
 {
 public:
 	static void Initialize();
 	static void Finalize();
 	static LuaSpore& Get();
 	static bool Exists();
-
+	
+	LuaSpore(const LuaSpore&) = delete;
+    LuaSpore& operator=(const LuaSpore&) = delete;
+	LuaSpore(LuaSpore&&) = delete;
+    LuaSpore& operator=(LuaSpore&&) = delete;
 private:
 	static LuaSpore* mInstance;
 
 	LuaSpore();
-	~LuaSpore() override;
-
-	virtual int AddRef() override;
-	virtual int Release() override;
+	~LuaSpore();
 public:
-	lua_State* GetLuaState() const { return mLuaState; }
+	[[nodiscard]] lua_State* GetLuaState() const { return mLuaState; }
 
 	void PostInit();
 
-	void Update() override;
+	void Update(double dt) const;
 
 	void ResetLuaState();
 
 	bool CallLuaFunction(int narg, int nret) const;
-	bool DoLuaFile(const char* group, const char* instance) const;
+	bool DoLuaFile(const char* package, const char* group, const char* instance) const;
 
-	static int LoadLuaBuffer(lua_State* L, const char* group, const char* instance);
+	static int LoadLuaBuffer(lua_State* L, const char* package, const char* group, const char* instance);
 
 private:
 	void NewLuaState();
@@ -46,10 +43,12 @@ private:
 
 private:
 	lua_State* mLuaState;
-	Clock mClock;
+	
+	struct tCheshireCat; 
+	tCheshireCat* mOpaquePtr;
 
 	int mLuaTraceback;
 	int mLuaUpdate;
 };
 
-LuaSpore& GetLuaSpore();
+extern LUAAPI LuaSpore& GetLuaSpore();

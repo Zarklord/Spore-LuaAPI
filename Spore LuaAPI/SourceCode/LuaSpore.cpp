@@ -1,24 +1,165 @@
 #include <pch.h>
 #ifdef LUAAPI_DLL_EXPORT
 
+#include <LuaSpore/LuaSpore.h>
 
-#include "LuaSpore.h"
+#include <Spore/Resource/cResourceManager.h>
 
+#include <EASTL/hash_set.h>
 #include <algorithm>
+#include <cuchar>
 
-#include "Spore/Resource/cResourceManager.h"
+EXTERN_C IMAGE_DOS_HEADER __ImageBase;
+
+eastl::string16 GetModAPIRoot()
+{
+	TCHAR DllPath[MAX_PATH] = {0};
+	GetModuleFileName(reinterpret_cast<HINSTANCE>(&__ImageBase), DllPath, _countof(DllPath));
+
+	eastl::string16 lua_dev_folder;
+	lua_dev_folder.reserve(MAX_PATH);
+	lua_dev_folder.sprintf(u"%ls", DllPath);
+	
+	//removes the mlibs\\file.dll from the path
+	lua_dev_folder.resize(lua_dev_folder.find_last_of('\\')); 
+	lua_dev_folder.resize(lua_dev_folder.find_last_of('\\')+1);
+
+	return lua_dev_folder;
+}
+
+eastl::string16 GetPackageNameFromDatabase(const Resource::Database* database)
+{
+	const eastl::string16 location = database->GetLocation();
+	const auto location_length = location.size();
+	if (location.find(u".package",  location_length - 8) != eastl::string16::npos)
+	{
+		const auto last_slash = location.find_last_of(u"/\\") + 1;
+		auto package = location.substr(last_slash, location_length - last_slash - 8);
+
+		return package;
+	}
+	return u"";
+}
+
+struct LuaSpore::tCheshireCat : public DefaultRefCounted, public App::IUpdatable
+{
+	tCheshireCat(LuaSpore* lua_spore)
+	: mLuaSpore(lua_spore)
+	, mClock(Clock::Mode::Milliseconds)
+	{
+		mAbsoluteLuaDevDir = GetModAPIRoot();
+		mAbsoluteLuaDevDir.append_sprintf(u"\\%ls", luadev_folder);
+
+		LocateLuaMods();
+	}
+
+	void LocateLuaMods()
+	{
+		Resource::IResourceManager::DatabaseList databases;
+		auto count = ResourceManager.GetDatabaseList(databases);
+
+		for (const auto database : databases)
+		{
+			auto package_name = GetPackageNameFromDatabase(database);
+
+			if (!package_name.empty())
+			{
+				mLuaDatabases[package_name] = database;
+			}
+		}
+
+		eastl::string16 luadev_dir;
+		luadev_dir.append_sprintf(u"%ls\\*", mAbsoluteLuaDevDir.c_str());
+
+		const eastl::wstring find_dir = reinterpret_cast<const wchar_t*>(luadev_dir.c_str());
+		
+		WIN32_FIND_DATA FileData;
+		const HANDLE hFind = FindFirstFileW(find_dir.c_str(), &FileData);
+		if (hFind != INVALID_HANDLE_VALUE) {
+			do {
+			    if (FileData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+			    {
+					//skip "." and ".." directories
+					if (FileData.cFileName[0] == '.')
+					{
+						if (FileData.cFileName[1] == 0 || (FileData.cFileName[1] == '.' && FileData.cFileName[2] == 0))
+							continue;
+					}
+
+					eastl::string16 folder_name = reinterpret_cast<char16_t*>(FileData.cFileName);
+					mLuaFolders.insert(folder_name);
+			    }
+			} while (FindNextFileW(hFind, &FileData) != 0);
+
+			FindClose(hFind);
+		}
+	}
+
+	Resource::Database* GetDatabase(const eastl::string& dbpf_name)
+	{
+		eastl::string16 dbpf_name_16;
+		dbpf_name_16.sprintf(u"%hs", dbpf_name.c_str());
+		const auto it = mLuaDatabases.find(dbpf_name_16.c_str());
+		if (it != mLuaDatabases.end())
+		{
+			return it->second;
+		}
+
+		return nullptr;
+	}
+
+	bool GetFolder(const eastl::string& folder_name) const
+	{
+		eastl::string16 folder_name_16;
+		folder_name_16.sprintf(u"%hs", folder_name.c_str());
+
+		return mLuaFolders.count(folder_name_16.c_str()) == 1;
+	}
+
+	const eastl::string16& GetLuaDevAbsolute()
+	{
+		return mAbsoluteLuaDevDir;
+	}
+
+	void Update() override
+	{
+		const double dt = mClock.GetElapsedTime() / 1000.0;
+		mClock.Reset();
+		mClock.Start();
+		mLuaSpore->Update(dt);
+	}
+
+	virtual int AddRef() override
+	{
+		return DefaultRefCounted::AddRef();
+	}
+
+	virtual int Release() override
+	{
+		return DefaultRefCounted::Release();
+	}
+private:
+	static constexpr const char16_t* luadev_folder = u"luadev";
+
+	LuaSpore* mLuaSpore;
+
+	eastl::string16 mAbsoluteLuaDevDir;
+
+	Clock mClock;
+	
+	eastl::hash_map<eastl::string16, Resource::Database*> mLuaDatabases;
+	eastl::hash_set<eastl::string16> mLuaFolders;
+};
 
 LuaSpore* LuaSpore::mInstance = nullptr;
 void LuaSpore::Initialize()
 {
-	mInstance = new LuaSpore();
-	mInstance->AddRef();
+	new LuaSpore();
 }
 
 void LuaSpore::Finalize()
 {
-	mInstance->Release();
-	mInstance = nullptr;
+	delete mInstance;
 }
 
 LuaSpore& LuaSpore::Get()
@@ -34,16 +175,6 @@ bool LuaSpore::Exists()
 LuaSpore& GetLuaSpore()
 {
 	return LuaSpore::Get();	
-}
-
-int LuaSpore::AddRef()
-{
-	return DefaultRefCounted::AddRef();
-}
-
-int LuaSpore::Release()
-{
-	return DefaultRefCounted::Release();
 }
 
 void* LuaStateAlloc(void* ud, void* ptr, size_t osize, size_t nsize)
@@ -71,35 +202,40 @@ void* LuaStateAlloc(void* ud, void* ptr, size_t osize, size_t nsize)
 
 LuaSpore::LuaSpore()
 : mLuaState(nullptr)
-, mClock(Clock::Mode::Milliseconds)
+, mOpaquePtr(new tCheshireCat(this))
 , mLuaTraceback(LUA_NOREF)
 , mLuaUpdate(LUA_NOREF)
 {
+	mInstance = this;
+
+	mOpaquePtr->AddRef();
+
 	NewLuaState();
 }
 
 LuaSpore::~LuaSpore()
 {
+	mOpaquePtr->Release();
+	mOpaquePtr = nullptr;
+
 	CloseLuaState();
+
+	mInstance = nullptr;
 }
 	
 
 void LuaSpore::PostInit()
 {
 	//this has a lifetime of the whole game, so we don't need to store the result to remove the update function
-	App::AddUpdateFunction(this);
+	App::AddUpdateFunction(mOpaquePtr);
 }
 
-void LuaSpore::Update()
+void LuaSpore::Update(double dt) const
 {
-	const int milliseconds = mClock.GetElapsedTime();
-	mClock.Reset();
-	mClock.Start();
-
 	if (!mLuaState || mLuaUpdate == LUA_NOREF || mLuaUpdate == LUA_REFNIL) return;
 	
 	lua_rawgeti(mLuaState, LUA_REGISTRYINDEX, mLuaUpdate);
-	lua_pushnumber(mLuaState, static_cast<double>(milliseconds) / 1000.0);
+	lua_pushnumber(mLuaState, dt);
 	const bool result = CallLuaFunction(1, 0);
 }
 
@@ -128,7 +264,7 @@ void LuaSpore::NewLuaState()
 
 	LoadLuaGlobals();
 	
-	if (!DoLuaFile("scripts", "main"))
+	if (!DoLuaFile("luaspore", "scripts", "main"))
 	{
 		return;
 	}
@@ -155,33 +291,35 @@ void LuaSpore::ResetLuaState()
 	NewLuaState();
 }
 
-int LuaDBPFSearcher(lua_State* L)
+int LuaSearcher(lua_State* L)
 {
 	const eastl::string modulename = luaL_checkstring(L, 1);
-	const auto first_sep = modulename.find_first_of(".\\/");
-	const auto last_sep = modulename.find_last_of(".\\/");
-	if (first_sep == eastl::string::npos)
+
+	const auto package_end = modulename.find_first_of(".\\/");
+	const auto group_end = modulename.find_last_of(".\\/");
+
+	if (package_end == eastl::string::npos)
 	{
 		eastl::string errmsg;
-		errmsg.sprintf("file '%s' is missing a directory", modulename.c_str());
+		errmsg.sprintf("file '%s' is missing a package and group", modulename.c_str());
 		lua_pushstring(L, errmsg.c_str());
 	}
-	else if (first_sep != last_sep)
+	else if (group_end == package_end)
 	{
 		eastl::string errmsg;
-		errmsg.sprintf("file '%s' can only have one directory", modulename.c_str());
+		errmsg.sprintf("file '%s' is missing a package", modulename.c_str());
 		lua_pushstring(L, errmsg.c_str());
 	}
-	else
+
+	const eastl::string package = modulename.substr(0, package_end);
+	const eastl::string group = modulename.substr(package_end+1, group_end - (package_end+1));
+	const eastl::string instance = modulename.substr(group_end+1);
+
+	if (!LuaSpore::LoadLuaBuffer(L, package.c_str(), group.c_str(), instance.c_str()))
 	{
-		const eastl::string group = modulename.substr(0, first_sep);
-		const eastl::string instance = modulename.substr(first_sep +  1);
-		if (!LuaSpore::LoadLuaBuffer(L, group.c_str(), instance.c_str()))
-		{
-			eastl::string errmsg;
-			errmsg.sprintf("file '%s' is not found", modulename.c_str());
-			lua_pushstring(L, errmsg.c_str());
-		}
+		eastl::string errmsg;
+		errmsg.sprintf("file '%s' is not found", modulename.c_str());
+		lua_pushstring(L, errmsg.c_str());
 	}
 	return 1;
 }
@@ -198,8 +336,8 @@ void LuaSpore::UpdatePackageSearchers() const
 	lua_pushnil(mLuaState);
 	lua_rawseti(mLuaState, -2, 3); //package.searchers[3] = nil
 
-	lua_pushcfunction(mLuaState, LuaDBPFSearcher);
-	lua_rawseti(mLuaState, -2, 2); //package.searchers[2] = LuaDBPFSearcher
+	lua_pushcfunction(mLuaState, LuaSearcher);
+	lua_rawseti(mLuaState, -2, 2); //package.searchers[2] = LuaSearcher
 
 	lua_remove(mLuaState, -1);	
 }
@@ -223,15 +361,14 @@ bool LuaSpore::CallLuaFunction(int narg, int nret) const
 	return true;
 }
 
-bool LuaSpore::DoLuaFile(const char* group, const char* instance) const
+bool LuaSpore::DoLuaFile(const char* package, const char* group, const char* instance) const
 {
-	eastl::string filename = group;
-	filename += "/";
-	filename += instance;
-	filename += ".lua";
+	eastl::string filename;
+	filename.sprintf("%s/%s/%s.lua", package, group, instance);
+
 	ModAPI::Log("DoLuaFile %s", filename.c_str());
 
-	bool success = LoadLuaBuffer(mLuaState, group, instance) == 1;
+	bool success = LoadLuaBuffer(mLuaState, package, group, instance) == 1;
 	if (success)
 	{
 		const int base = lua_gettop(mLuaState);
@@ -240,7 +377,6 @@ bool LuaSpore::DoLuaFile(const char* group, const char* instance) const
 		success = lua_pcall(mLuaState, 0, LUA_MULTRET, base) == LUA_OK;
 		lua_remove(mLuaState, base);
 	}
-
 
 	if (!success)
 	{
@@ -252,29 +388,54 @@ bool LuaSpore::DoLuaFile(const char* group, const char* instance) const
 	return success;
 }
 
-int LuaSpore::LoadLuaBuffer(lua_State* L, const char* group, const char* instance)
+int LuaSpore::LoadLuaBuffer(lua_State* L, const char* package, const char* group, const char* instance)
 {
-	const ResourceKey lua_file(id(instance), id("lua"), id(group));
+	const auto& lua_spore = GetLuaSpore();
+	
+	eastl::vector<char*> data;
 
-	Resource::IRecord* pRecord;
-	const auto database = ResourceManager.FindDatabase(lua_file);
-	if (!database || !database->OpenRecord(lua_file, &pRecord))
+	if (lua_spore.mOpaquePtr->GetFolder(package))
 	{
-		return 0;
+		eastl::string16 fullpath;
+		fullpath.sprintf(u"%ls\\%hs\\%hs\\%hs.lua", lua_spore.mOpaquePtr->GetLuaDevAbsolute().c_str(), package, group, instance);
+
+		if (!IO::File::Exists(fullpath.c_str()))
+		{
+			return 0;
+		}
+
+		const FileStreamPtr lua_file = new IO::FileStream(fullpath.c_str());
+		if (!lua_file->Open(IO::AccessFlags::Read, IO::CD::OpenExisting))
+		{
+			return 0;
+		}
+
+		const auto size = lua_file->GetSize();
+		data.resize(size);
+		lua_file->Read(data.data(), size);
+		lua_file->Close();
+	}
+	else
+	{
+		const ResourceKey lua_file(id(instance), id("lua"), id(group));
+
+		Resource::IRecord* record;
+		const auto database = lua_spore.mOpaquePtr->GetDatabase(package);
+		if (!database || !database->OpenRecord(lua_file, &record))
+		{
+			return 0;
+		}
+
+		const auto size = record->GetStream()->GetSize();
+		data.resize(size);
+		record->GetStream()->Read(data.data(), size);
+		record->RecordClose();
 	}
 
-	pRecord->GetStream()->SetPosition(0);
-	const auto size = pRecord->GetStream()->GetSize();
-	eastl::vector<char*> data(size);
-	pRecord->GetStream()->Read(data.data(), size);
-	pRecord->RecordClose();
+	eastl::string filename;
+	filename.sprintf("%s/%s/%s.lua", package, group, instance);
 
-	eastl::string filename = group;
-	filename += "/";
-	filename += instance;
-	filename += ".lua";
-
-	return luaL_loadbufferx(L, reinterpret_cast<const char*>(data.data()), size, filename.c_str(), "t") == LUA_OK;
+	return luaL_loadbufferx(L, reinterpret_cast<const char*>(data.data()), data.size(), filename.c_str(), "t") == LUA_OK;
 }
 
 #endif

@@ -13,8 +13,8 @@
     <Filter Include="SourceCode\DLL">
       <UniqueIdentifier>{86fd4b1b-cca9-4c19-b855-9bb4f6f0b739}</UniqueIdentifier>
     </Filter>
-    <Filter Include="SourceCode\Console">
-      <UniqueIdentifier>{0109d75f-71fa-48a9-8eff-3508f0b329e9}</UniqueIdentifier>
+    <Filter Include="SourceCode\Bindings">
+      <UniqueIdentifier>{83a13d7d-3f49-4002-9267-417a40ed3260}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -24,14 +24,17 @@
     <ClCompile Include="SourceCode\DLL\pch.cpp">
       <Filter>SourceCode\DLL</Filter>
     </ClCompile>
-    <ClCompile Include="SourceCode\Console\LuaConsole.cpp">
-      <Filter>SourceCode\Console</Filter>
-    </ClCompile>
     <ClCompile Include="SourceCode\LuaSpore.cpp">
       <Filter>SourceCode</Filter>
     </ClCompile>
     <ClCompile Include="SourceCode\LuaGlobals.cpp">
       <Filter>SourceCode</Filter>
+    </ClCompile>
+    <ClCompile Include="SourceCode\DLL\LuaConsole.cpp">
+      <Filter>SourceCode\DLL</Filter>
+    </ClCompile>
+    <ClCompile Include="SourceCode\Bindings\PropManagerReg.cpp">
+      <Filter>SourceCode\Bindings</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -41,13 +44,22 @@
     <ClInclude Include="SourceCode\DLL\targetver.h">
       <Filter>SourceCode\DLL</Filter>
     </ClInclude>
-    <ClInclude Include="SourceCode\Console\LuaConsole.h">
-      <Filter>SourceCode\Console</Filter>
-    </ClInclude>
     <ClInclude Include="LuaSpore\LuaSpore.h">
       <Filter>LuaSpore</Filter>
     </ClInclude>
     <ClInclude Include="LuaSpore\LuaInternal.h">
+      <Filter>LuaSpore</Filter>
+    </ClInclude>
+    <ClInclude Include="SourceCode\DLL\LuaConsole.h">
+      <Filter>SourceCode\DLL</Filter>
+    </ClInclude>
+    <ClInclude Include="LuaSpore\Lunar.h">
+      <Filter>LuaSpore</Filter>
+    </ClInclude>
+    <ClInclude Include="LuaSpore\DefaultIncludes.h">
+      <Filter>LuaSpore</Filter>
+    </ClInclude>
+    <ClInclude Include="LuaSpore\LuaUtil.h">
       <Filter>LuaSpore</Filter>
     </ClInclude>
   </ItemGroup>

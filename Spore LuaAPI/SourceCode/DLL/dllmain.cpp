@@ -1,10 +1,10 @@
-#include <pch.h>
+#include <pch.h>	
 
 
 #ifdef LUAAPI_DLL_EXPORT
 
-#include "LuaSpore.h"
-#include "Console/LuaConsole.h"
+#include <LuaSpore/LuaSpore.h>
+#include "LuaConsole.h"
 
 void Main()
 {
