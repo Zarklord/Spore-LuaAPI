@@ -33,9 +33,14 @@
     <ClCompile Include="SourceCode\DLL\LuaConsole.cpp">
       <Filter>SourceCode\DLL</Filter>
     </ClCompile>
-    <ClCompile Include="SourceCode\Bindings\PropManagerReg.cpp">
+    <ClCompile Include="SourceCode\Bindings\PropManager.cpp">
       <Filter>SourceCode\Bindings</Filter>
     </ClCompile>
+    <ClCompile Include="SourceCode\Bindings\PropertyList.cpp" />
+    <ClCompile Include="SourceCode\Bindings\Property.cpp" />
+    <ClCompile Include="SourceCode\Bindings\PropertyArray.cpp" />
+    <ClCompile Include="SourceCode\Bindings\PropertyTypes.cpp" />
+    <ClCompile Include="SourceCode\Types\LuaPropertyArray.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="SourceCode\DLL\pch.h">
@@ -53,14 +58,16 @@
     <ClInclude Include="SourceCode\DLL\LuaConsole.h">
       <Filter>SourceCode\DLL</Filter>
     </ClInclude>
-    <ClInclude Include="LuaSpore\Lunar.h">
-      <Filter>LuaSpore</Filter>
-    </ClInclude>
     <ClInclude Include="LuaSpore\DefaultIncludes.h">
       <Filter>LuaSpore</Filter>
     </ClInclude>
-    <ClInclude Include="LuaSpore\LuaUtil.h">
-      <Filter>LuaSpore</Filter>
-    </ClInclude>
+    <ClInclude Include="LuaSpore\LuaAPI.h" />
+    <ClInclude Include="LuaSpore\Extensions\Property.h" />
+    <ClInclude Include="sol\config.hpp" />
+    <ClInclude Include="sol\forward.hpp" />
+    <ClInclude Include="sol\sol.hpp" />
+    <ClInclude Include="LuaSpore\SolExtensions.h" />
+    <ClInclude Include="LuaSpore\Bindings.h" />
+    <ClInclude Include="LuaSpore\Types\LuaPropertyArray.h" />
   </ItemGroup>
 </Project>

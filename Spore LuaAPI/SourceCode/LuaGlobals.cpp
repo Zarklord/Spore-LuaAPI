@@ -4,31 +4,22 @@
 
 #include <LuaSpore/LuaSpore.h>
 
-int LuaPrint(lua_State* L)
+void LuaPrint(const char* str)
 {
-	ModAPI::Log(luaL_checkstring(L, 1));
-	return 0;
+	ModAPI::Log(str);
 }
 
-int LuaHash(lua_State* L)
+uint32_t LuaHash(const char* str)
 {
-	lua_pushinteger(L, id(luaL_checkstring(L, 1)));
-	return 1;
+	return id(str);
 }
 
-void LuaSpore::LoadLuaGlobals() const
+void LuaSpore::LoadLuaGlobals(sol::state& s)
 {
-	lua_pushcfunction(mLuaState, LuaPrint);
-	lua_setglobal(mLuaState, "LuaPrint");
-
-	lua_pushcfunction(mLuaState, LuaHash);
-	lua_setglobal(mLuaState, "id");
-
-	lua_pushinteger(mLuaState, static_cast<uint32_t>(ModAPI::GetGameType()));
-	lua_setglobal(mLuaState, "GAMETYPE");
-
-	lua_pushnumber(mLuaState, lua_version(mLuaState));
-	lua_setglobal(mLuaState, "LUA_VERSION");
+	s["LuaPrint"] = LuaPrint;
+	s["id"] = LuaHash;
+	s["GAMETYPE"] = static_cast<uint32_t>(ModAPI::GetGameType());
+	s["LUA_VERSION"] = lua_version(s);
 }
 
 #endif

@@ -1,10 +1,20 @@
 #pragma once
 
 #include <LuaSpore\LuaInternal.h>
+#include <LuaSpore\DefaultIncludes.h>
 
-class LUAAPI LuaSpore
+class LuaSpore
 {
 public:
+	LUAAPI [[nodiscard]] lua_State* GetLuaState() const;
+	LUAAPI [[nodiscard]] sol::state_view GetState() const
+	{
+		return sol::state_view(GetLuaState());
+	}
+	LUAAPI bool DoLuaFile(const char* file) const;
+	LUAAPI static sol::optional<sol::function> LoadLuaBuffer(const char* package, const char* group, const char* instance);
+
+LUA_INTERNALPUBLIC:
 	static void Initialize();
 	static void Finalize();
 	static LuaSpore& Get();
@@ -14,41 +24,34 @@ public:
     LuaSpore& operator=(const LuaSpore&) = delete;
 	LuaSpore(LuaSpore&&) = delete;
     LuaSpore& operator=(LuaSpore&&) = delete;
+	
+	void PostInit() const;
 private:
 	static LuaSpore* mInstance;
 
 	LuaSpore();
 	~LuaSpore();
-public:
-	[[nodiscard]] lua_State* GetLuaState() const { return mLuaState; }
-
-	void PostInit();
-
+private:
 	void Update(double dt) const;
 
-	void ResetLuaState();
+	static void LoadLuaGlobals(sol::state& s);
 
-	bool CallLuaFunction(int narg, int nret) const;
-	bool DoLuaFile(const char* package, const char* group, const char* instance) const;
+	void LocateLuaMods();
+	Resource::Database* GetDatabase(const eastl::string& dbpf_name);
+	bool GetFolder(const eastl::string& folder_name) const;
+	const eastl::string16& GetLuaDevAbsolute();
 
-	static int LoadLuaBuffer(lua_State* L, const char* package, const char* group, const char* instance);
+	static constexpr const char16_t* luadev_folder = u"luadev";
 
-private:
-	void NewLuaState();
-	void CloseLuaState();
+	sol::state mState;
 
-	void UpdatePackageSearchers() const;
+	sol::function mLuaTraceback;
+	sol::function mLuaUpdate;
+
+	eastl::string16 mAbsoluteLuaDevDir;
 	
-	void LoadLuaGlobals() const;
-
-private:
-	lua_State* mLuaState;
-	
-	struct tCheshireCat; 
-	tCheshireCat* mOpaquePtr;
-
-	int mLuaTraceback;
-	int mLuaUpdate;
+	eastl::hash_map<eastl::string16, Resource::Database*> mLuaDatabases;
+	eastl::hash_set<eastl::string16> mLuaFolders;
 };
 
 extern LUAAPI LuaSpore& GetLuaSpore();

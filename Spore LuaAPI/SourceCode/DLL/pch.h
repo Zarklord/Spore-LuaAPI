@@ -7,9 +7,5 @@
 
 #include <Spore\BasicIncludes.h>
 #include <Spore\App\cCheatManager.h>
-
-extern "C" {
-#include <lua.h>
-#include <lualib.h>
-#include <lauxlib.h>
-}
+#include <sol\sol.hpp>
+#include <LuaSpore\SolExtensions.h>

@@ -7,21 +7,21 @@
 
 using namespace LuaConsole;
 
-virtual_detour(ProcessLine__detour, App::cCheatManager, App::ICheatManager, bool(const char*))
+virtual_detour(ProcessLine, App::cCheatManager, App::ICheatManager, bool(const char*))
 {
 	bool detoured(const char* pString)
 	{
 		bool success = false;
 
-		const auto& lua_spore = GetLuaSpore();
-		auto* L = lua_spore.GetLuaState();
-		if (sExecuteCheatCommand != LUA_NOREF && sExecuteCheatCommand != LUA_REFNIL)
+		auto& lua_spore = GetLuaSpore();
+		auto& s = lua_spore.GetState();
+		if (sExecuteCheatCommand.valid())
 		{
-			lua_rawgeti(L, LUA_REGISTRYINDEX, sExecuteCheatCommand);
-			success = luaL_loadbufferx(L, pString, strlen(pString), nullptr, "t") == LUA_OK;
+			auto result = s.load_buffer(pString, strlen(pString), "CheatConsoleInput", sol::load_mode::text);
+			success = result.valid();
 			if (success)
 			{
-				success = lua_spore.CallLuaFunction(1, 0);
+				sExecuteCheatCommand(result);
 			}
 		}
 
@@ -33,19 +33,22 @@ virtual_detour(ProcessLine__detour, App::cCheatManager, App::ICheatManager, bool
 		return success;
 	}
 
-	static inline int sExecuteCheatCommand = LUA_NOREF;
+	static inline sol::function sExecuteCheatCommand;
 };
 
 void LuaConsole::AttachDetours()
 {
-	ProcessLine__detour::attach(GetAddress(App::cCheatManager, ProcessLine));
+	ProcessLine::attach(GetAddress(App::cCheatManager, ProcessLine));
 }
 
-void LuaConsole::PostInit()
+void LuaConsole::LuaInitialize(sol::state_view& s)
 {
-	auto* L = GetLuaSpore().GetLuaState();
-	lua_getglobal(L, "ExecuteCheatCommand");	
-	ProcessLine__detour::sExecuteCheatCommand = luaL_ref(L, LUA_REGISTRYINDEX);
+	ProcessLine::sExecuteCheatCommand = s["ExecuteCheatCommand"];
+}
+
+void LuaConsole::LuaDispose(sol::state_view& s)
+{
+	ProcessLine::sExecuteCheatCommand.reset();
 }
 
 #endif

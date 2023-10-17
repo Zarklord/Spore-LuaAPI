@@ -1,10 +1,11 @@
-#include <pch.h>	
-
+#include <pch.h>
 
 #ifdef LUAAPI_DLL_EXPORT
 
 #include <LuaSpore/LuaSpore.h>
-#include "LuaConsole.h"
+#include <LuaSpore/LuaAPI.h>
+#include <LuaSpore/Bindings.h>
+#include <LuaConsole.h>
 
 void Main()
 {
@@ -12,21 +13,31 @@ void Main()
 
 void Initialize()
 {
-	ManualBreakpoint();
+	//ManualBreakpoint();
 	LuaSpore::Initialize();
 }
 
 void PostInitialize()
 {
-	LuaSpore& lua_spore = GetLuaSpore();
-	lua_spore.PostInit();
-	
-	LuaConsole::PostInit();
+	GetLuaSpore().PostInit();
 }
 
 void Dispose()
 {
 	LuaSpore::Finalize();
+}
+
+void LuaInitialize(lua_State* L)
+{
+	sol::state_view s(L);
+	LuaConsole::LuaInitialize(s);
+	LuaAPI::RegisterSporeBindings(s);
+}
+
+void LuaDispose(lua_State* L)
+{
+	sol::state_view s(L);
+	LuaConsole::LuaDispose(s);
 }
 
 void AttachDetours()
@@ -43,6 +54,8 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD  ul_reason_for_call, LPVOID lpReser
 		ModAPI::AddPostInitFunction(PostInitialize);
 		ModAPI::AddInitFunction(Initialize);
 		ModAPI::AddDisposeFunction(Dispose);
+		LuaAPI::AddLuaInitFunction(LuaInitialize);
+		LuaAPI::AddLuaDisposeFunction(LuaDispose);
 
 		PrepareDetours(hModule);
 		AttachDetours();
