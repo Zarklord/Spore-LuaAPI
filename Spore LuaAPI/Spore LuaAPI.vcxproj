@@ -201,7 +201,6 @@
     <None Include="SdkPathConfig.props" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="SourceCode\Bindings\PropertyArray.cpp" />
     <ClCompile Include="SourceCode\Bindings\PropertyList.cpp" />
     <ClCompile Include="SourceCode\Bindings\Property.cpp" />
     <ClCompile Include="SourceCode\Bindings\PropertyTypes.cpp" />
@@ -214,19 +213,18 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release DLL|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug DLL|Win32'">Create</PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="SourceCode\LuaBinding.cpp" />
     <ClCompile Include="SourceCode\LuaGlobals.cpp" />
     <ClCompile Include="SourceCode\LuaSpore.cpp" />
-    <ClCompile Include="SourceCode\Types\LuaPropertyArray.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="LuaSpore\Bindings.h" />
+    <ClInclude Include="LuaSpore\LuaBinding.h" />
     <ClInclude Include="LuaSpore\DefaultIncludes.h" />
     <ClInclude Include="LuaSpore\Extensions\Property.h" />
     <ClInclude Include="LuaSpore\LuaAPI.h" />
     <ClInclude Include="LuaSpore\LuaInternal.h" />
     <ClInclude Include="LuaSpore\LuaSpore.h" />
     <ClInclude Include="LuaSpore\SolExtensions.h" />
-    <ClInclude Include="LuaSpore\Types\LuaPropertyArray.h" />
     <ClInclude Include="sol\config.hpp" />
     <ClInclude Include="sol\forward.hpp" />
     <ClInclude Include="sol\sol.hpp" />

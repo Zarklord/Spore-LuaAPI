@@ -1,124 +1,408 @@
 #include <pch.h>
+
 #ifdef LUAAPI_DLL_EXPORT
 
-#include <LuaSpore\Bindings.h>
+#include <LuaSpore\LuaBinding.h>
 
-void LuaAPI::RegisterProperty(sol::state_view& s)
+#include <LuaSpore\Extensions\Property.h>
+
+static eastl::hash_map<std::uintptr_t, size_t> PropertyAllocationSize;
+
+static void PropertyLuaReserve(App::Property& property, size_t size)
 {
+	auto& property_ext = GetPropertyExt(property);
+	const size_t item_count = property_ext.GetItemCount();
+
+	const auto it = PropertyAllocationSize.find(reinterpret_cast<std::uintptr_t>(property_ext.GetDataPointer()));
+	const size_t current_allocation_length = it != PropertyAllocationSize.end() ? it->second : item_count;
 	
-}
+	const bool owns_memory = property_ext.OwnsMemory();
+	if (current_allocation_length >= size && owns_memory) return;
 
-/*
-int PropertyReg::IsArray(lua_State* L)
-{
-	lua_pushboolean(L, mProperty->IsArray());
-	return 1;
-}
+	const size_t item_size = property_ext.mnType == App::PropertyType::String8 ? sizeof(eastl::string8) : property_ext.GetItemSize();
 
-int PropertyReg::GetCount(lua_State* L)
-{
-	lua_pushinteger(L, mProperty->IsArray() ? mProperty->GetItemCount() : 1);
-	return 1;
-}
-
-template<typename T>
-int PushValue(Extensions::Property* prop, lua_State* L)
-{
-	const T* value = static_cast<T*>(prop->GetValue());
-	const size_t item_count = prop->GetItemCount();
-	if (prop->IsArray())
+	void* old_mem = property_ext.GetValuePointer();
+	void* new_mem = new char[size * item_size];
+	switch(property_ext.mnType)
 	{
-		lua_createtable(L, static_cast<int>(item_count), 0);
-		for(size_t i = 0; i < item_count; ++i)
+		case App::PropertyType::String8:
 		{
-			lua_pushinteger(L, i);
-			lua_pushsporetype(L, value[i]);
-			lua_settable(L, -3);
+			if (property_ext.GetItemSize() == 8)
+			{
+				for (size_t i = 0; i < item_count; ++i)
+				{
+					const auto& [old_begin, old_end] = static_cast<Extensions::Property::smfx_array_string_8*>(old_mem)[i];
+					auto& new_value = static_cast<eastl::string8*>(new_mem)[i];
+					new_value = eastl::string8(old_begin, old_end);
+				}
+			}
+			else
+			{
+				for (size_t i = 0; i < item_count; ++i)
+				{
+					auto& old_value = static_cast<eastl::string8*>(old_mem)[i];
+					auto& new_value = static_cast<eastl::string8*>(new_mem)[i];
+					if (owns_memory)
+					{
+						new_value = {};
+						old_value.swap(new_value);
+					}
+					else
+					{
+						new_value = old_value;
+					}
+				}
+			}
+			break;
 		}
-		lua_pushinteger(L, item_count);
+		case App::PropertyType::String16:
+		{
+			for (size_t i = 0; i < item_count; ++i)
+			{
+				auto& old_value = static_cast<eastl::string16*>(old_mem)[i];
+				auto& new_value = static_cast<eastl::string16*>(new_mem)[i];
+				if (owns_memory)
+				{
+					new_value = {};
+					old_value.swap(new_value);
+				}
+				else
+				{
+					new_value = old_value;
+				}
+			}
+			break;
+		}
+		case App::PropertyType::Text:
+		{
+			for (size_t i = 0; i < item_count; ++i)
+			{
+				const auto& old_value = static_cast<LocalizedString*>(old_mem)[i];
+				auto& new_value = static_cast<LocalizedString*>(new_mem)[i];
+				new_value = old_value;
+			}
+			break;
+		}
+		case App::PropertyType::Bool:
+		case App::PropertyType::Int32:
+		case App::PropertyType::UInt32:
+		case App::PropertyType::Float:
+		case App::PropertyType::Key:
+		case App::PropertyType::Vector2:
+		case App::PropertyType::Vector3:
+		case App::PropertyType::ColorRGB:
+		case App::PropertyType::Vector4:
+		case App::PropertyType::ColorRGBA:
+		case App::PropertyType::Transform:
+		case App::PropertyType::BBox:
+		{
+			memcpy(new_mem, old_mem, item_size*item_count);
+			break;
+		}
+		default:
+		{
+			break;
+		}
 	}
-	else
+	PropertyAllocationSize[reinterpret_cast<std::uintptr_t>(new_mem)] = size;
+	const auto new_flags = static_cast<short>((property.mnFlags & ~Extensions::Property::kPropertyFlagSkipDealloc)
+		| Extensions::Property::kPropertyFlagCleanup | Extensions::Property::kPropertyFlagPointer);
+	property.Set(property.mnType, new_flags, new_mem, item_size, item_count);
+}
+
+static void PropertyLuaSet(sol::this_state L, App::Property& property, size_t index, sol::stack_object value)
+{
+	const sol::state_view s(L);
+	const auto idx = index - 1;
+
+	auto& property_ext = GetPropertyExt(property);
+	const size_t item_count = property_ext.GetItemCount();
+
+	if (idx > item_count || !property_ext.OwnsMemory())
 	{
-		lua_pushsporetype(L, *value);
-		lua_pushinteger(L, 1);
+		PropertyLuaReserve(property, index);
+		
+		void* void_value_ptr = property_ext.GetValuePointer();
+		for (size_t i = item_count; i < index; ++i)
+		{
+			switch(property_ext.mnType)
+			{
+				case App::PropertyType::Bool:
+				{
+					auto* value_ptr = static_cast<bool*>(void_value_ptr);
+					value_ptr[idx] = bool{};
+					break;
+				}
+				case App::PropertyType::Int32:
+				{
+					auto* value_ptr = static_cast<int32_t*>(void_value_ptr);
+					value_ptr[idx] = int32_t{};
+					break;
+				}
+				case App::PropertyType::UInt32:
+				{
+					auto* value_ptr = static_cast<uint32_t*>(void_value_ptr);
+					value_ptr[idx] = uint32_t{};
+					break;
+				}
+				case App::PropertyType::Float:
+				{
+					auto* value_ptr = static_cast<float*>(void_value_ptr);
+					value_ptr[idx] = float{};
+					break;
+				}
+				case App::PropertyType::String8:
+				{
+					auto* value_ptr = static_cast<eastl::string8*>(void_value_ptr);
+					value_ptr[idx] = eastl::string8{};
+					break;
+				}
+				case App::PropertyType::String16:
+				{
+					auto* value_ptr = static_cast<eastl::string16*>(void_value_ptr);
+					value_ptr[idx] = eastl::string16{};
+					break;
+				}
+				case App::PropertyType::Key:
+				{
+					auto* value_ptr = static_cast<ResourceKey*>(void_value_ptr);
+					value_ptr[idx] = ResourceKey{};
+					break;
+				}
+				case App::PropertyType::Text:
+				{
+					auto* value_ptr = static_cast<LocalizedString*>(void_value_ptr);
+					value_ptr[idx] = LocalizedString{};
+					break;
+				}
+				case App::PropertyType::Vector2:
+				{
+					auto* value_ptr = static_cast<Vector2*>(void_value_ptr);
+					value_ptr[idx] = Vector2{};
+					break;
+				}
+				case App::PropertyType::Vector3:
+				{
+					auto* value_ptr = static_cast<Vector3*>(void_value_ptr);
+					value_ptr[idx] = Vector3{};
+					break;
+				}
+				case App::PropertyType::ColorRGB:
+				{
+					auto* value_ptr = static_cast<ColorRGB*>(void_value_ptr);
+					value_ptr[idx] = ColorRGB{};
+					break;
+				}
+				case App::PropertyType::Vector4:
+				{
+					auto* value_ptr = static_cast<Vector4*>(void_value_ptr);
+					value_ptr[idx] = Vector4{};
+					break;
+				}
+				case App::PropertyType::ColorRGBA:
+				{
+					auto* value_ptr = static_cast<ColorRGBA*>(void_value_ptr);
+					value_ptr[idx] = ColorRGBA{};
+					break;
+				}
+				case App::PropertyType::Transform:
+				{
+					auto* value_ptr = static_cast<Transform*>(void_value_ptr);
+					value_ptr[idx] = Transform{};
+					break;
+				}
+				case App::PropertyType::BBox:
+				{
+					auto* value_ptr = static_cast<BoundingBox*>(void_value_ptr);
+					value_ptr[idx] = BoundingBox{};
+					break;
+				}
+				default:
+				{
+					return;
+				}
+			}
+		}
 	}
-	return 2;
+
+	void* void_value_ptr = property_ext.GetValuePointer();
+	switch(property_ext.mnType)
+	{
+		case App::PropertyType::String8:
+		{
+			auto* value_ptr = static_cast<eastl::string8*>(void_value_ptr);
+			const auto new_str = value.as<sol::string_view>();
+			value_ptr[idx].assign(new_str.data(), new_str.length());
+		}
+		case App::PropertyType::String16:
+		{
+			auto* value_ptr = static_cast<eastl::string16*>(void_value_ptr);
+			const auto new_str = value.as<sol::u16string_view>();
+			value_ptr[idx].assign(new_str.data(), new_str.length());
+			break;
+		}
+		case App::PropertyType::Text:
+		{
+			auto* value_ptr = static_cast<LocalizedString*>(void_value_ptr);
+			value_ptr[idx] = value.as<LocalizedString>();
+			break;
+		}
+		case App::PropertyType::Bool:
+		case App::PropertyType::Int32:
+		case App::PropertyType::UInt32:
+		case App::PropertyType::Float:
+		case App::PropertyType::Key:
+		case App::PropertyType::Vector2:
+		case App::PropertyType::Vector3:
+		case App::PropertyType::ColorRGB:
+		case App::PropertyType::Vector4:
+		case App::PropertyType::ColorRGBA:
+		case App::PropertyType::Transform:
+		case App::PropertyType::BBox:
+		{
+			const auto type_size = property_ext.GetItemSize();
+			memcpy(static_cast<char*>(void_value_ptr) + idx * type_size, value.as<void*>(), type_size);
+			break;
+		}
+		default:
+		{
+			break;
+		}
+	}
 }
 
-int PropertyReg::GetValueInt32(lua_State* L)
+static sol::object PropertyLuaGet(sol::this_state L, App::Property& property, sol::optional<size_t> index)
 {
-	return PushValue<int32_t>(mProperty, L);
+	const sol::state_view s(L);
+	const auto idx = index.value_or(1) - 1;
+	
+	auto& property_ext = GetPropertyExt(property);
+	const size_t num_values = property_ext.GetItemCount();
+
+	if (idx > num_values)
+	{
+		return sol::make_object(L, sol::nil);
+	}
+
+	void* void_value_ptr = property_ext.GetValuePointer();
+	
+	switch(property_ext.mnType)
+	{
+		case App::PropertyType::Bool:
+		{
+			const auto* value_ptr = static_cast<const bool*>(void_value_ptr);
+			return sol::make_object(L, value_ptr[idx]);
+		}
+		case App::PropertyType::Int32:
+		{
+			const auto* value_ptr = static_cast<const int32_t*>(void_value_ptr);
+			return sol::make_object(L, value_ptr[idx]);
+		}
+		case App::PropertyType::UInt32:
+		{
+			const auto* value_ptr = static_cast<const uint32_t*>(void_value_ptr);
+			return sol::make_object(L, value_ptr[idx]);
+		}
+		case App::PropertyType::Float:
+		{
+			const auto* value_ptr = static_cast<const float*>(void_value_ptr);
+			return sol::make_object(L, value_ptr[idx]);
+		}
+		case App::PropertyType::String8:
+		{
+			if (property_ext.GetItemSize() == 8)
+			{
+				const auto* value_ptr = static_cast<const Extensions::Property::smfx_array_string_8*>(void_value_ptr);
+				return sol::make_object(L, sol::string_view(value_ptr->begin, value_ptr->end - value_ptr->begin));
+			}
+			else
+			{
+				const auto* value_ptr = static_cast<const eastl::string8*>(void_value_ptr);
+				return sol::make_object(L, value_ptr[idx].c_str());
+			}
+		}
+		case App::PropertyType::String16:
+		{
+			const auto* value_ptr = static_cast<const eastl::string16*>(void_value_ptr);
+			return sol::make_object(L, value_ptr[idx].c_str());
+		}
+		case App::PropertyType::Key:
+		{
+			auto* value_ptr = static_cast<ResourceKey*>(void_value_ptr);
+			return sol::make_object(L, value_ptr[idx]);
+		}
+		case App::PropertyType::Text:
+		{
+			auto* value_ptr = static_cast<LocalizedString*>(void_value_ptr);
+			return sol::make_object(L, value_ptr[idx]);
+		}
+		case App::PropertyType::Vector2:
+		{
+			auto* value_ptr = static_cast<Vector2*>(void_value_ptr);
+			return sol::make_object(L, value_ptr[idx]);
+		}
+		case App::PropertyType::Vector3:
+		{
+			auto* value_ptr = static_cast<Vector3*>(void_value_ptr);
+			return sol::make_object(L, value_ptr[idx]);
+		}
+		case App::PropertyType::ColorRGB:
+		{
+			auto* value_ptr = static_cast<ColorRGB*>(void_value_ptr);
+			return sol::make_object(L, value_ptr[idx]);
+		}
+		case App::PropertyType::Vector4:
+		{
+			auto* value_ptr = static_cast<Vector4*>(void_value_ptr);
+			return sol::make_object(L, value_ptr[idx]);
+		}
+		case App::PropertyType::ColorRGBA:
+		{
+			auto* value_ptr = static_cast<ColorRGBA*>(void_value_ptr);
+			return sol::make_object(L, value_ptr[idx]);
+		}
+		case App::PropertyType::Transform:
+		{
+			auto* value_ptr = static_cast<Transform*>(void_value_ptr);
+			return sol::make_object(L, value_ptr[idx]);
+		}
+		case App::PropertyType::BBox:
+		{
+			auto* value_ptr = static_cast<BoundingBox*>(void_value_ptr);
+			return sol::make_object(L, value_ptr[idx]);
+		}
+		default:
+		{
+			return sol::make_object(L, sol::nil);
+		}
+	}
 }
 
-int PropertyReg::GetValueFloat(lua_State* L)
+static size_t PropertyLuaLength(const App::Property& property)
 {
-	return PushValue<float>(mProperty, L);
+	const auto& property_ext = GetPropertyExt(property);
+	return property_ext.IsArray() ? property_ext.GetItemCount() : 1u;
 }
 
-int PropertyReg::GetValueBool(lua_State* L)
+AddLuaBinding(Property, sol::state_view s)
 {
-	return PushValue<bool>(mProperty, L);
+	s.new_usertype<App::Property>(
+		"Property",
+		"IsArray", [](const App::Property& property)
+		{
+			return GetPropertyExt(property).IsArray();
+		},
+		sol::meta_function::length, PropertyLuaLength,
+		"GetItemCount", PropertyLuaLength,
+		sol::meta_function::index, PropertyLuaGet,
+		"Get", PropertyLuaGet,
+		sol::meta_function::new_index, PropertyLuaSet,
+		"Set", [](sol::this_state L, App::Property& property, sol::stack_object value)
+		{
+			PropertyLuaSet(L, property, 1, value);
+		},
+		"Reserve", PropertyLuaReserve
+	);
 }
-
-int PropertyReg::GetValueUInt32(lua_State* L)
-{
-	return PushValue<uint32_t>(mProperty, L);
-}
-
-int PropertyReg::GetValueVector2(lua_State* L)
-{
-	return PushValue<Vector2>(mProperty, L);
-}
-
-int PropertyReg::GetValueVector3(lua_State* L)
-{
-	return PushValue<Vector3>(mProperty, L);
-}
-
-int PropertyReg::GetValueVector4(lua_State* L)
-{
-	return PushValue<Vector4>(mProperty, L);
-}
-
-int PropertyReg::GetValueColorRGB(lua_State* L)
-{
-	return PushValue<ColorRGB>(mProperty, L);
-}
-
-int PropertyReg::GetValueColorRGBA(lua_State* L)
-{
-	return PushValue<ColorRGBA>(mProperty, L);
-}
-
-int PropertyReg::GetValueKey(lua_State* L)
-{
-	return PushValue<ResourceKey>(mProperty, L);
-}
-
-int PropertyReg::GetValueTransform(lua_State* L)
-{
-	return PushValue<Transform>(mProperty, L);
-}
-
-int PropertyReg::GetValueText(lua_State* L)
-{
-	return PushValue<LocalizedString>(mProperty, L);
-}
-
-int PropertyReg::GetValueBBox(lua_State* L)
-{
-	return PushValue<BoundingBox>(mProperty, L);
-}
-
-int PropertyReg::GetValueString8(lua_State* L)
-{
-	return PushValue<eastl::string8>(mProperty, L);
-}
-
-int PropertyReg::GetValueString16(lua_State* L)
-{
-	return PushValue<eastl::string16>(mProperty, L);
-}
-*/
 
 #endif

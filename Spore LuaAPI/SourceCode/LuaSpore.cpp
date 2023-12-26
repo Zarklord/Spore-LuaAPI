@@ -2,6 +2,7 @@
 #ifdef LUAAPI_DLL_EXPORT
 
 #include <LuaSpore/LuaSpore.h>
+#include <LuaSpore/LuaBinding.h>
 #include <LuaSpore/LuaAPI.h>
 
 #include <Spore/Resource/cResourceManager.h>
@@ -14,11 +15,16 @@ namespace LuaAPI
 {
 	constexpr int MAX_MODS = 2048;
 	eastl::fixed_vector<LuaFunction, MAX_MODS> sLuaInitFunctions;
+	eastl::fixed_vector<LuaFunction, MAX_MODS> sLuaPostInitFunctions;
 	eastl::fixed_vector<LuaFunction, MAX_MODS> sLuaDisposeFunctions;
 
 	void AddLuaInitFunction(LuaFunction f)
 	{
 		sLuaInitFunctions.push_back(f);
+	}
+	void AddLuaPostInitFunction(LuaFunction f)
+	{
+		sLuaPostInitFunctions.push_back(f);
 	}
 	void AddLuaDisposeFunction(LuaFunction f)
 	{
@@ -63,23 +69,17 @@ void* LuaStateAlloc(void* ud, void* ptr, size_t osize, size_t nsize)
 {
 	if (nsize == 0)
 	{
-		const char* data = static_cast<char*>(ptr);
-		delete[] data;
-
+		delete[] static_cast<char*>(ptr);
 		return nullptr;
 	}
-	else
-	{
-		const auto result = new char[nsize];
-		if (ptr)
-		{
-			memcpy(result, ptr, std::min(nsize, osize));
 
-			const char* data = static_cast<char*>(ptr);
-			delete[] data;
-		}
-		return result;
+	const auto result = new char[nsize];
+	if (ptr)
+	{
+		memcpy(result, ptr, std::min(nsize, osize));
+		delete[] static_cast<char*>(ptr);
 	}
+	return result;
 }
 
 EXTERN_C IMAGE_DOS_HEADER __ImageBase;
@@ -99,34 +99,34 @@ static eastl::string16 GetModAPIRoot()
 	return lua_dev_folder;
 }
 
-sol::object LuaSearcher(sol::this_state L, const eastl::string& modulename)
+sol::object LuaSearcher(sol::this_state L, const sol::string_view& modulename)
 {
 	sol::state_view s(L);
 	const auto package_end = modulename.find_first_of(".\\/");
 	const auto group_end = modulename.find_last_of(".\\/");
 
-	if (package_end == eastl::string::npos)
+	if (package_end == sol::string_view::npos)
 	{
 		eastl::string errmsg;
-		errmsg.sprintf("file '%s' is missing a package and group", modulename.c_str());
+		errmsg.sprintf("file '%s' is missing a package and group", modulename.data());
 		return sol::make_object(s, errmsg);
 	}
 	else if (group_end == package_end)
 	{
 		eastl::string errmsg;
-		errmsg.sprintf("file '%s' is missing a package", modulename.c_str());
+		errmsg.sprintf("file '%s' is missing a package", modulename.data());
 		return sol::make_object(s, errmsg);
 	}
 
-	const eastl::string package = modulename.substr(0, package_end);
-	const eastl::string group = modulename.substr(package_end+1, group_end - (package_end+1));
-	const eastl::string instance = modulename.substr(group_end+1);
+	const sol::string_view package = modulename.substr(0, package_end);
+	const sol::string_view group = modulename.substr(package_end+1, group_end - (package_end+1));
+	const sol::string_view instance = modulename.substr(group_end+1);
 
-	sol::optional<sol::function> fn = LuaSpore::LoadLuaBuffer(package.c_str(), group.c_str(), instance.c_str());
+	sol::optional<sol::function> fn = LuaSpore::LoadLuaBuffer(package.data(), group.data(), instance.data());
 	if (!fn)
 	{
 		eastl::string errmsg;
-		errmsg.sprintf("file '%s' is not found", modulename.c_str());
+		errmsg.sprintf("file '%s' is not found", modulename.data());
 		return sol::make_object(s, errmsg);
 	}
 	return sol::make_object(s, fn);
@@ -134,8 +134,6 @@ sol::object LuaSearcher(sol::this_state L, const eastl::string& modulename)
 
 LuaSpore::LuaSpore()
 : mState(LuaPanic, LuaStateAlloc, this)
-, mLuaDatabases()
-, mLuaFolders()
 {
 	mInstance = this;
 	mAbsoluteLuaDevDir = GetModAPIRoot();
@@ -164,6 +162,8 @@ LuaSpore::LuaSpore()
 		package_searchers[4] = sol::nil;
 	}
 
+	LuaAPI::LuaBinding::ExecuteLuaBindings(mState.lua_state());
+
 	LoadLuaGlobals(mState);
 
 	for (const auto function : LuaAPI::sLuaInitFunctions)
@@ -174,6 +174,11 @@ LuaSpore::LuaSpore()
 	if (!DoLuaFile("luaspore/scripts/main"))
 	{
 		return;
+	}
+
+	for (const auto function : LuaAPI::sLuaPostInitFunctions)
+	{
+		function(mState.lua_state());
 	}
 	
 	mLuaUpdate = mState["Update"];
@@ -331,10 +336,10 @@ void LuaSpore::LocateLuaMods()
 	}
 }
 
-Resource::Database* LuaSpore::GetDatabase(const eastl::string& dbpf_name)
+Resource::Database* LuaSpore::GetDatabase(const char* dbpf_name)
 {
 	eastl::string16 dbpf_name_16;
-	dbpf_name_16.sprintf(u"%hs", dbpf_name.c_str());
+	dbpf_name_16.sprintf(u"%hs", dbpf_name);
 	const auto it = mLuaDatabases.find(dbpf_name_16.c_str());
 	if (it != mLuaDatabases.end())
 	{
@@ -344,10 +349,10 @@ Resource::Database* LuaSpore::GetDatabase(const eastl::string& dbpf_name)
 	return nullptr;
 }
 
-bool LuaSpore::GetFolder(const eastl::string& folder_name) const
+bool LuaSpore::GetFolder(const char * folder_name) const
 {
 	eastl::string16 folder_name_16;
-	folder_name_16.sprintf(u"%hs", folder_name.c_str());
+	folder_name_16.sprintf(u"%hs", folder_name);
 
 	return mLuaFolders.count(folder_name_16.c_str()) == 1;
 }

@@ -13,8 +13,8 @@ virtual_detour(ProcessLine, App::cCheatManager, App::ICheatManager, bool(const c
 	{
 		bool success = false;
 
-		auto& lua_spore = GetLuaSpore();
-		auto& s = lua_spore.GetState();
+		const auto& lua_spore = GetLuaSpore();
+		auto s = lua_spore.GetState();
 		if (sExecuteCheatCommand.valid())
 		{
 			auto result = s.load_buffer(pString, strlen(pString), "CheatConsoleInput", sol::load_mode::text);

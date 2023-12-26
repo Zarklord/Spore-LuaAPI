@@ -5,7 +5,8 @@
 namespace LuaAPI
 {
 	typedef void(*LuaFunction)(lua_State* L);
-
+	
 	extern LUAAPI void AddLuaInitFunction(LuaFunction);
+	extern LUAAPI void AddLuaPostInitFunction(LuaFunction);
 	extern LUAAPI void AddLuaDisposeFunction(LuaFunction);
 }

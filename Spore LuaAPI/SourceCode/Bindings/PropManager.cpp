@@ -1,11 +1,9 @@
 #include <pch.h>
 #ifdef LUAAPI_DLL_EXPORT
 
-#include <LuaSpore\Bindings.h>
+#include <LuaSpore\LuaBinding.h>
 
-using namespace LuaAPI;
-
-void LuaAPI::RegisterPropManager(sol::state_view& s)
+AddLuaBinding(PropManager, sol::state_view s)
 {
 	s.new_usertype<App::IPropManager>(
 		"IPropManager",

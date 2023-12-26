@@ -1,9 +1,9 @@
 #include <pch.h>
 #ifdef LUAAPI_DLL_EXPORT
 
-#include <LuaSpore\Bindings.h>
+#include <LuaSpore\LuaBinding.h>
 
-void LuaAPI::RegisterPropertyList(sol::state_view& s)
+AddLuaBinding(PropertyList, sol::state_view s)
 {
 	
 }

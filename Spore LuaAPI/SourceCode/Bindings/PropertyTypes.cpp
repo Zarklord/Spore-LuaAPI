@@ -2,9 +2,9 @@
 
 #ifdef LUAAPI_DLL_EXPORT
 
-#include <LuaSpore\Bindings.h>
+#include <LuaSpore\LuaBinding.h>
 
-void LuaAPI::RegisterPropertyTypes(sol::state_view& s)
+AddLuaBinding(PropertyTypes, sol::state_view s)
 {
 	s.new_usertype<ResourceKey>(
 		"ResourceKey",
@@ -140,7 +140,7 @@ void LuaAPI::RegisterPropertyTypes(sol::state_view& s)
 		sol::constructors<BoundingBox(), BoundingBox(const Vector3&, const Vector3&)>(),
 		"lower", &BoundingBox::lower,
 		"upper", &BoundingBox::upper
-	);
+	);	
 }
 
 #endif

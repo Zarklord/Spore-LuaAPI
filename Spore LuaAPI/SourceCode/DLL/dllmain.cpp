@@ -4,7 +4,7 @@
 
 #include <LuaSpore/LuaSpore.h>
 #include <LuaSpore/LuaAPI.h>
-#include <LuaSpore/Bindings.h>
+#include <LuaSpore\LuaBinding.h>
 #include <LuaConsole.h>
 
 void Main()
@@ -13,7 +13,9 @@ void Main()
 
 void Initialize()
 {
-	//ManualBreakpoint();
+#if defined(LUAAPI_DLL_EXPORT) && defined(_DEBUG)
+	ManualBreakpoint();
+#endif
 	LuaSpore::Initialize();
 }
 
@@ -31,7 +33,6 @@ void LuaInitialize(lua_State* L)
 {
 	sol::state_view s(L);
 	LuaConsole::LuaInitialize(s);
-	LuaAPI::RegisterSporeBindings(s);
 }
 
 void LuaDispose(lua_State* L)

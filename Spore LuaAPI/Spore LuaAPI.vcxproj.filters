@@ -38,9 +38,8 @@
     </ClCompile>
     <ClCompile Include="SourceCode\Bindings\PropertyList.cpp" />
     <ClCompile Include="SourceCode\Bindings\Property.cpp" />
-    <ClCompile Include="SourceCode\Bindings\PropertyArray.cpp" />
     <ClCompile Include="SourceCode\Bindings\PropertyTypes.cpp" />
-    <ClCompile Include="SourceCode\Types\LuaPropertyArray.cpp" />
+    <ClCompile Include="SourceCode\LuaBinding.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="SourceCode\DLL\pch.h">
@@ -67,7 +66,6 @@
     <ClInclude Include="sol\forward.hpp" />
     <ClInclude Include="sol\sol.hpp" />
     <ClInclude Include="LuaSpore\SolExtensions.h" />
-    <ClInclude Include="LuaSpore\Bindings.h" />
-    <ClInclude Include="LuaSpore\Types\LuaPropertyArray.h" />
+    <ClInclude Include="LuaSpore\LuaBinding.h" />
   </ItemGroup>
 </Project>

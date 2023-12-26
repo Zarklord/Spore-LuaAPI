@@ -4,14 +4,14 @@
 
 #include <LuaSpore/LuaSpore.h>
 
-void LuaPrint(const char* str)
+static void LuaPrint(const char* str)
 {
 	ModAPI::Log(str);
 }
 
-uint32_t LuaHash(const char* str)
+static uint32_t LuaHash(const LuaFNVHash& value)
 {
-	return id(str);
+	return value;
 }
 
 void LuaSpore::LoadLuaGlobals(sol::state& s)
