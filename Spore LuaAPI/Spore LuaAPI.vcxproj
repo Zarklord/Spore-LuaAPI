@@ -213,15 +213,19 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release DLL|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug DLL|Win32'">Create</PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="SourceCode\SporeDetours.cpp" />
     <ClCompile Include="SourceCode\LuaBinding.cpp" />
     <ClCompile Include="SourceCode\LuaGlobals.cpp" />
+    <ClCompile Include="SourceCode\SporeInitializer.cpp" />
     <ClCompile Include="SourceCode\LuaSpore.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="LuaSpore\SporeDetours.h" />
     <ClInclude Include="LuaSpore\LuaBinding.h" />
     <ClInclude Include="LuaSpore\DefaultIncludes.h" />
     <ClInclude Include="LuaSpore\Extensions\Property.h" />
     <ClInclude Include="LuaSpore\LuaAPI.h" />
+    <ClInclude Include="LuaSpore\SporeInitializer.h" />
     <ClInclude Include="LuaSpore\LuaInternal.h" />
     <ClInclude Include="LuaSpore\LuaSpore.h" />
     <ClInclude Include="LuaSpore\SolExtensions.h" />

@@ -4,14 +4,14 @@
 
 #include <LuaSpore/LuaSpore.h>
 #include <LuaSpore/LuaAPI.h>
-#include <LuaSpore\LuaBinding.h>
+#include <LuaSpore/LuaBinding.h>
+#include <LuaSpore/SporeInitializer.h>
+#include <LuaSpore/SporeDetours.h>
 #include <LuaConsole.h>
 
 void Main()
 {
 }
-
-extern void PropertyLuaInitialize();
 
 void Initialize()
 {
@@ -19,7 +19,7 @@ void Initialize()
 	ManualBreakpoint();
 #endif
 	LuaSpore::Initialize();
-	PropertyLuaInitialize();
+	LuaAPI::SporeInitializer::ExecuteSporeInitializers();
 }
 
 void PostInitialize()
@@ -44,12 +44,10 @@ void LuaDispose(lua_State* L)
 	LuaConsole::LuaDispose(s);
 }
 
-extern void PropertyLuaAttachDetours();
-
 void AttachDetours()
 {
 	LuaConsole::AttachDetours();
-	PropertyLuaAttachDetours();
+	LuaAPI::SporeDetours::AttachSporeDetours();
 }
 
 BOOL APIENTRY DllMain(HMODULE hModule, DWORD  ul_reason_for_call, LPVOID lpReserved)

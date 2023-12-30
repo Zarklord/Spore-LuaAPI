@@ -4,7 +4,7 @@
 
 #include <LuaSpore\LuaBinding.h>
 
-AddLuaBinding(PropertyTypes, sol::state_view s)
+AddLuaBinding(sol::state_view s)
 {
 	s.new_usertype<ResourceKey>(
 		"ResourceKey",

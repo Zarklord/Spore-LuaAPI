@@ -3,7 +3,7 @@
 
 #include <LuaSpore\LuaBinding.h>
 
-AddLuaBinding(PropertyList, sol::state_view s)
+AddLuaBinding(sol::state_view s)
 {
 	s.new_usertype<App::PropertyList>(
 		"PropertyList",

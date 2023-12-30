@@ -57,14 +57,20 @@ namespace LuaAPI
 
 	template <typename T>
 	inline LuaBindingImpl<T> LuaBindingInstance<T>::s_lua_binding_inst;
-
-#define AddLuaBinding(name, binding_arg)												\
-	namespace LuaBindings																\
-	{																					\
-		class LuaBinding##name : public LuaAPI::LuaBindingInstance<LuaBinding##name>	\
-		{																				\
-			static void BindingFunction(binding_arg);									\
-		};																				\
-	}																					\
-	void LuaBindings::LuaBinding##name::BindingFunction(binding_arg)
 }
+
+#define _LuaBindingConcatImpl(x, y) x##y
+#define _LuaBindingConcat(x, y) _LuaBindingConcatImpl(x, y)
+#define _AddLuaBindingImpl(class_name, binding_arg)							 \
+	namespace LuaBindings  													 \
+	{																		 \
+		namespace  															 \
+		{																	 \
+			class class_name : public LuaAPI::LuaBindingInstance<class_name> \
+			{																 \
+				static void BindingFunction(binding_arg);					 \
+			};																 \
+		}																	 \
+	}																		 \
+	void LuaBindings::class_name::BindingFunction(binding_arg)
+#define AddLuaBinding(binding_arg) _AddLuaBindingImpl(_LuaBindingConcat(LuaBindingCallback, __COUNTER__), binding_arg)

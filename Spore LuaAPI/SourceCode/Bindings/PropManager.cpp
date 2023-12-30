@@ -3,7 +3,7 @@
 
 #include <LuaSpore\LuaBinding.h>
 
-AddLuaBinding(PropManager, sol::state_view s)
+AddLuaBinding(sol::state_view s)
 {
 	s.new_usertype<App::IPropManager>(
 		"IPropManager",

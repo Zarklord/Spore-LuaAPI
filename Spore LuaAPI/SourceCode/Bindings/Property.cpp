@@ -2,15 +2,17 @@
 
 #ifdef LUAAPI_DLL_EXPORT
 
-#include <LuaSpore\LuaBinding.h>
+#include <LuaSpore/LuaBinding.h>
+#include <LuaSpore/SporeInitializer.h>
+#include <LuaSpore/SporeDetours.h>
 
-#include <LuaSpore\Extensions\Property.h>
+#include <LuaSpore/Extensions/Property.h>
 
 static eastl::hash_map<std::uintptr_t, size_t>* sPropertyAllocationSize;
 static PropertyListPtr sConstructedProperties = nullptr;
 static uint32_t sConstructedPropertiesID = 0;
 
-void PropertyLuaInitialize()
+AddSporeInitializer()
 {
 	sConstructedProperties = new App::PropertyList();
 	sPropertyAllocationSize = new eastl::hash_map<uintptr_t, size_t>();
@@ -32,7 +34,7 @@ member_detour(Property_Clear, App::Property, void(bool arg_0))
 	}
 };
 
-void PropertyLuaAttachDetours()
+AddSporeDetours()
 {
 	Property_Clear::attach(GetAddress(App::Property, Clear));
 }
@@ -513,7 +515,7 @@ static size_t PropertyLuaLength(const Extensions::Property& property)
 	return property.IsArray() ? property.GetItemCount() : 1u;
 }
 
-AddLuaBinding(Property, sol::state_view s)
+AddLuaBinding(sol::state_view s)
 {	
 	s.new_usertype<App::Property>(
 		"Property",
