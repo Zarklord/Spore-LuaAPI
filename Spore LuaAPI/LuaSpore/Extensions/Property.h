@@ -25,13 +25,10 @@ namespace Extensions
 	class Property;
 }
 
-inline const Extensions::Property& GetPropertyExt(const App::Property& prop);
-
-inline Extensions::Property& GetPropertyExt(App::Property& prop);
-
-inline const Extensions::Property* GetPropertyExt(const App::Property* prop);
-
-inline Extensions::Property* GetPropertyExt(App::Property* prop);
+constexpr const Extensions::Property& GetPropertyExt(const App::Property& prop);
+constexpr Extensions::Property& GetPropertyExt(App::Property& prop);
+constexpr const Extensions::Property* GetPropertyExt(const App::Property* prop);
+constexpr Extensions::Property* GetPropertyExt(App::Property* prop);
 
 namespace Extensions
 {
@@ -164,14 +161,32 @@ namespace Extensions
 	}
 }
 
-inline const Extensions::Property& GetPropertyExt(const App::Property& prop)
+constexpr const Extensions::Property& GetPropertyExt(const App::Property& prop)
 { return static_cast<const Extensions::Property&>(prop); }
 
-inline Extensions::Property& GetPropertyExt(App::Property& prop)
+constexpr Extensions::Property& GetPropertyExt(App::Property& prop)
 { return static_cast<Extensions::Property&>(prop); }
 
-inline const Extensions::Property* GetPropertyExt(const App::Property* prop)
+constexpr const Extensions::Property* GetPropertyExt(const App::Property* prop)
 { return static_cast<const Extensions::Property*>(prop); }
 
-inline Extensions::Property* GetPropertyExt(App::Property* prop)
+constexpr Extensions::Property* GetPropertyExt(App::Property* prop)
 { return static_cast<Extensions::Property*>(prop); }
+
+template <typename Handler>
+inline bool sol_lua_check(sol::types<Extensions::Property>, lua_State* L, int index, Handler&& handler, sol::stack::record& tracking)
+{
+	tracking.use(1);
+	return sol::stack::check<App::Property>(L, lua_absindex(L, index), handler);
+}
+
+inline Extensions::Property& sol_lua_get(sol::types<Extensions::Property>, lua_State* L, int index, sol::stack::record& tracking)
+{
+	tracking.use(1);
+	return GetPropertyExt(sol::stack::get<App::Property>(L, lua_absindex(L, index)));
+} 
+
+inline int sol_lua_push(lua_State* L, Extensions::Property& prop)
+{
+	return sol::stack::push(L, static_cast<App::Property>(prop));
+}

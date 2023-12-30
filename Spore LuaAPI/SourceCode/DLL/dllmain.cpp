@@ -11,12 +11,15 @@ void Main()
 {
 }
 
+extern void PropertyLuaInitialize();
+
 void Initialize()
 {
 #if defined(LUAAPI_DLL_EXPORT) && defined(_DEBUG)
 	ManualBreakpoint();
 #endif
 	LuaSpore::Initialize();
+	PropertyLuaInitialize();
 }
 
 void PostInitialize()
@@ -41,9 +44,12 @@ void LuaDispose(lua_State* L)
 	LuaConsole::LuaDispose(s);
 }
 
+extern void PropertyLuaAttachDetours();
+
 void AttachDetours()
 {
 	LuaConsole::AttachDetours();
+	PropertyLuaAttachDetours();
 }
 
 BOOL APIENTRY DllMain(HMODULE hModule, DWORD  ul_reason_for_call, LPVOID lpReserved)
