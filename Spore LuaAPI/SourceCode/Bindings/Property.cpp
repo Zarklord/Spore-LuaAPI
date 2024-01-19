@@ -343,6 +343,7 @@ static void PropertyLuaReserve(Extensions::Property& property, size_t size)
 	const auto new_flags = static_cast<short>((property.mnFlags & ~Extensions::Property::kPropertyFlagSkipDealloc)
 		| Extensions::Property::kPropertyFlagCleanup | Extensions::Property::kPropertyFlagPointer);
 	property.Set(property.mnType, new_flags, new_mem, item_size, item_count);
+	delete static_cast<char*>(old_mem);
 }
 
 static void PropertyLuaSet(sol::this_state L, Extensions::Property& property, size_t index, sol::stack_object value)

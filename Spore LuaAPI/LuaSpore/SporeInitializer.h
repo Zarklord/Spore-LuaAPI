@@ -62,8 +62,8 @@ namespace LuaAPI
 
 #define _SporeInitializerConcatImpl(x, y) x##y
 #define _SporeInitializerConcat(x, y) _SporeInitializerConcatImpl(x, y)
-#define _AddSporeInitializerImpl(class_name)											\
-	namespace SporeInitializer  														\
+#define _AddSporeInitializerImpl(class_name)										\
+	namespace SporeInitializer  													\
 	{																				\
 		namespace  																	\
 		{																			\

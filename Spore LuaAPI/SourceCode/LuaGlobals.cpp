@@ -6,7 +6,7 @@
 
 static void LuaPrint(const char* str)
 {
-	ModAPI::Log(str);
+	ModAPI::Log("[Lua] %s", str);
 }
 
 static uint32_t LuaHash(const LuaFNVHash& value)

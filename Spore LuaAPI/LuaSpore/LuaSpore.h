@@ -12,8 +12,10 @@ public:
 	{
 		return {GetLuaState()};
 	}
-	LUAAPI bool DoLuaFile(const char* file) const;
-	LUAAPI static sol::optional<sol::function> LoadLuaBuffer(const char* package, const char* group, const char* instance);
+	LUAAPI bool DoLuaFile(sol::string_view file) const;
+	LUAAPI static sol::optional<sol::function> LoadLuaBuffer(sol::string_view package, sol::string_view group, sol::string_view instance);
+	LUAAPI static bool LuaFileExists(sol::string_view package, sol::string_view group, sol::string_view instance);
+	LUAAPI static eastl::vector<sol::u16string_view> GetPackages();
 LUA_INTERNALPUBLIC:
 	static void Initialize();
 	static void Finalize();
@@ -37,8 +39,8 @@ private:
 	static void LoadLuaGlobals(sol::state& s);
 
 	void LocateLuaMods();
-	Resource::Database* GetDatabase(const char* dbpf_name);
-	bool GetFolder(const char * folder_name) const;
+	Resource::Database* GetDatabase(sol::string_view dbpf_name);
+	std::optional<eastl::string16> GetFolder(sol::string_view folder_name) const;
 	const eastl::string16& GetLuaDevAbsolute();
 
 	static constexpr const char16_t* luadev_folder = u"luadev";
@@ -49,9 +51,36 @@ private:
 	sol::function mLuaUpdate;
 
 	eastl::string16 mAbsoluteLuaDevDir;
+
+	struct case_insensitive_hash
+	{
+		size_t operator()(const string16& x) const
+		{
+			const char16_t* p = x.c_str();
+			unsigned int c, result = 2166136261U;
+			while((c = *p++) != 0)
+				result = (result * 16777619) ^ static_cast<unsigned int>(eastl::CharToLower(static_cast<char16_t>(c)));
+			return (size_t)result;
+		}
+	};
+
+	struct case_insensitive_equals
+	{
+		bool operator()(const string16& a, const string16& b) const
+		{
+			const size_t a_size = a.size();
+			if (a_size != b.size()) return false;
+			for (size_t i = 0; i < a_size; ++i)
+			{
+				if (eastl::CharToLower(a[i]) != eastl::CharToLower(b[i]))
+					return false;
+			}
+			return true;
+		}
+	};
 	
-	eastl::hash_map<eastl::string16, Resource::Database*> mLuaDatabases;
-	eastl::hash_set<eastl::string16> mLuaFolders;
+	eastl::hash_map<eastl::string16, Resource::Database*, case_insensitive_hash, case_insensitive_equals> mLuaDatabases;
+	eastl::hash_set<eastl::string16, case_insensitive_hash, case_insensitive_equals> mLuaFolders;
 };
 
 extern LUAAPI LuaSpore& GetLuaSpore();

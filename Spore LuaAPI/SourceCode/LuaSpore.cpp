@@ -122,7 +122,7 @@ sol::object LuaSearcher(sol::this_state L, const sol::string_view& modulename)
 	const sol::string_view group = modulename.substr(package_end+1, group_end - (package_end+1));
 	const sol::string_view instance = modulename.substr(group_end+1);
 
-	sol::optional<sol::function> fn = LuaSpore::LoadLuaBuffer(package.data(), group.data(), instance.data());
+	sol::optional<sol::function> fn = LuaSpore::LoadLuaBuffer(package, group, instance);
 	if (!fn)
 	{
 		eastl::string errmsg;
@@ -130,6 +130,43 @@ sol::object LuaSearcher(sol::this_state L, const sol::string_view& modulename)
 		return sol::make_object(s, errmsg);
 	}
 	return sol::make_object(s, fn);
+}
+
+static bool SporeLuaExists(sol::this_state L, const sol::string_view& modulename)
+{
+	sol::state_view s(L);
+	const auto package_end = modulename.find_first_of(".\\/");
+	const auto group_end = modulename.find_last_of(".\\/");
+
+	if (package_end == sol::string_view::npos || group_end == package_end)
+		return false;
+
+	const sol::string_view package = modulename.substr(0, package_end);
+	const sol::string_view group = modulename.substr(package_end+1, group_end - (package_end+1));
+	const sol::string_view instance = modulename.substr(group_end+1);
+
+	return LuaSpore::LuaFileExists(package, group, instance);
+}
+
+static sol::optional<sol::function> SporeLoadLua(sol::this_state L, const sol::string_view& modulename)
+{
+	sol::state_view s(L);
+	const auto package_end = modulename.find_first_of(".\\/");
+	const auto group_end = modulename.find_last_of(".\\/");
+
+	if (package_end == sol::string_view::npos || group_end == package_end)
+		return {};
+
+	const sol::string_view package = modulename.substr(0, package_end);
+	const sol::string_view group = modulename.substr(package_end+1, group_end - (package_end+1));
+	const sol::string_view instance = modulename.substr(group_end+1);
+
+	return LuaSpore::LoadLuaBuffer(package, group, instance);
+}
+
+static sol::as_table_t<eastl::vector<sol::u16string_view>> GetPackages(sol::this_state L)
+{
+	return sol::as_table(LuaSpore::GetPackages());
 }
 
 LuaSpore::LuaSpore()
@@ -153,6 +190,10 @@ LuaSpore::LuaSpore()
 		sol::lib::io,
 		sol::lib::utf8
 	);
+	
+	mState["SporeLuaExists"] = SporeLuaExists;
+	mState["SporeLoadLua"] = SporeLoadLua;
+	mState["GetSporeDBPFNames"] = []{ return sol::as_table(GetPackages()); };
 
 	auto package_searchers = mState["package"]["searchers"];
 	if (package_searchers.valid())
@@ -162,13 +203,13 @@ LuaSpore::LuaSpore()
 		package_searchers[4] = sol::nil;
 	}
 
-	LuaAPI::LuaBinding::ExecuteLuaBindings(mState.lua_state());
+	LuaAPI::LuaBinding::ExecuteLuaBindings(mState);
 
 	LoadLuaGlobals(mState);
 
 	for (const auto function : LuaAPI::sLuaInitFunctions)
 	{
-		function(mState.lua_state());
+		function(mState);
 	}
 	
 	if (!DoLuaFile("luaspore/scripts/main"))
@@ -178,7 +219,7 @@ LuaSpore::LuaSpore()
 
 	for (const auto function : LuaAPI::sLuaPostInitFunctions)
 	{
-		function(mState.lua_state());
+		function(mState);
 	}
 	
 	mLuaUpdate = mState["Update"];
@@ -217,29 +258,33 @@ lua_State* LuaSpore::GetLuaState() const
 	return mState.lua_state();
 }
 
-bool LuaSpore::DoLuaFile(const char* file) const
+bool LuaSpore::DoLuaFile(sol::string_view file) const
 {
-	ModAPI::Log("DoLuaFile %s.lua", file);
+	ModAPI::Log("DoLuaFile %.*s.lua", static_cast<int>(file.length()), file.data());
 
 	const auto& result = mState["require"](file);
 	if (!result.valid())
 	{
 		const sol::error err = result;
-		ModAPI::Log("DoLuaFile Error running lua file %s.lua:\n%s", file, err.what());
+		ModAPI::Log("DoLuaFile Error running lua file %.*s.lua:\n%s", static_cast<int>(file.length()), file.data(), err.what());
 		return false;
 	}
 	return true;
 }
 
-sol::optional<sol::function> LuaSpore::LoadLuaBuffer(const char* package, const char* group, const char* instance)
+sol::optional<sol::function> LuaSpore::LoadLuaBuffer(sol::string_view package, sol::string_view group, sol::string_view instance)
 {
 	LuaSpore& lua_spore = GetLuaSpore();
 	eastl::vector<char*> data;
 
-	if (lua_spore.GetFolder(package))
+	if (const auto folder = lua_spore.GetFolder(package))
 	{
 		eastl::string16 fullpath;
-		fullpath.sprintf(u"%ls\\%hs\\%hs\\%hs.lua", lua_spore.GetLuaDevAbsolute().c_str(), package, group, instance);
+		fullpath.sprintf(u"%ls\\%s\\%.*hs\\%.*hs.lua", lua_spore.GetLuaDevAbsolute().c_str(),
+			folder->c_str(),
+			static_cast<int>(group.length()), group.data(),
+			static_cast<int>(instance.length()), instance.data()
+		);
 
 		if (!IO::File::Exists(fullpath.c_str()))
 		{
@@ -275,9 +320,63 @@ sol::optional<sol::function> LuaSpore::LoadLuaBuffer(const char* package, const 
 	}
 
 	eastl::string filename;
-	filename.sprintf("%s/%s/%s.lua", package, group, instance);
+	filename.sprintf("%.*s/%.*s/%.*s.lua", 
+		static_cast<int>(package.length()), package.data(),
+		static_cast<int>(group.length()), group.data(),
+		static_cast<int>(instance.length()), instance.data()
+	);
 
 	return lua_spore.mState.load_buffer(reinterpret_cast<const char*>(data.data()), data.size(), filename.c_str(), sol::load_mode::text);
+}
+
+bool LuaSpore::LuaFileExists(sol::string_view package, sol::string_view group, sol::string_view instance)
+{
+	LuaSpore& lua_spore = GetLuaSpore();
+	eastl::vector<char*> data;
+
+	if (const auto folder = lua_spore.GetFolder(package))
+	{
+		eastl::string16 fullpath;
+		fullpath.sprintf(u"%ls\\%s\\%.*hs\\%.*hs.lua", lua_spore.GetLuaDevAbsolute().c_str(),
+			folder->c_str(),
+			static_cast<int>(group.length()), group.data(),
+			static_cast<int>(instance.length()), instance.data()
+		);
+
+		return IO::File::Exists(fullpath.c_str());
+	}
+	else
+	{
+		const ResourceKey lua_file(id(instance), id("lua"), id(group));
+
+		Resource::IRecord* record;
+		const auto database = lua_spore.GetDatabase(package);
+		if (!database || !database->OpenRecord(lua_file, &record))
+		{
+			return false;
+		}
+		record->RecordClose();
+		return true;
+	}
+}
+
+eastl::vector<sol::u16string_view> LuaSpore::GetPackages()
+{
+	LuaSpore& lua_spore = GetLuaSpore();
+	eastl::vector<sol::u16string_view> packages;
+
+	for (auto& package : lua_spore.mLuaFolders)
+	{
+		packages.push_back({package.c_str(), package.length()});
+	}
+
+	for (auto& [package, database] : lua_spore.mLuaDatabases)
+	{
+		if (lua_spore.mLuaFolders.count(package) == 1) continue;
+		packages.push_back({package.c_str(), package.length()});
+	}
+
+	return packages;
 }
 
 static eastl::string16 GetPackageNameFromDatabase(const Resource::Database* database)
@@ -287,9 +386,7 @@ static eastl::string16 GetPackageNameFromDatabase(const Resource::Database* data
 	if (location.find(u".package",  location_length - 8) != eastl::string16::npos)
 	{
 		const auto last_slash = location.find_last_of(u"/\\") + 1;
-		auto package = location.substr(last_slash, location_length - last_slash - 8);
-
-		return package;
+		return location.substr(last_slash, location_length - last_slash - 8);
 	}
 	return u"";
 }
@@ -336,25 +433,20 @@ void LuaSpore::LocateLuaMods()
 	}
 }
 
-Resource::Database* LuaSpore::GetDatabase(const char* dbpf_name)
+Resource::Database* LuaSpore::GetDatabase(sol::string_view dbpf_name)
 {
 	eastl::string16 dbpf_name_16;
-	dbpf_name_16.sprintf(u"%hs", dbpf_name);
-	const auto it = mLuaDatabases.find(dbpf_name_16.c_str());
-	if (it != mLuaDatabases.end())
-	{
-		return it->second;
-	}
-
-	return nullptr;
+	dbpf_name_16.sprintf(u"%.*hs", static_cast<int>(dbpf_name.length()), dbpf_name.data());
+	const auto it = mLuaDatabases.find(dbpf_name_16);
+	return it != mLuaDatabases.end() ? it->second : nullptr;
 }
 
-bool LuaSpore::GetFolder(const char * folder_name) const
+std::optional<eastl::string16> LuaSpore::GetFolder(sol::string_view folder_name) const
 {
 	eastl::string16 folder_name_16;
-	folder_name_16.sprintf(u"%hs", folder_name);
-
-	return mLuaFolders.count(folder_name_16.c_str()) == 1;
+	folder_name_16.sprintf(u"%.*hs", static_cast<int>(folder_name.length()), folder_name.data());
+	const auto it = mLuaFolders.find(folder_name_16);
+	return it != mLuaFolders.end() ? *it : std::optional<eastl::string16>();
 }
 
 const eastl::string16& LuaSpore::GetLuaDevAbsolute()
