@@ -1,16 +1,35 @@
-#include "pch.h"
+/****************************************************************************
+* Copyright (C) 2023-2024 Zarklord
+*
+* This file is part of Spore LuaAPI.
+*
+* Spore LuaAPI is free software: you can redistribute it and/or modify
+* it under the terms of the GNU General Public License as published by
+* the Free Software Foundation, either version 3 of the License, or
+* (at your option) any later version.
+*
+* This program is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+* GNU General Public License for more details.
+*
+* You should have received a copy of the GNU General Public License
+* along with Spore LuaAPI.  If not, see <http://www.gnu.org/licenses/>.
+****************************************************************************/
 
+#include "pch.h"
 #ifdef LUAAPI_DLL_EXPORT
 
-#include "LuaConsole.h"
 #include <LuaSpore/LuaSpore.h>
-
-using namespace LuaConsole;
+#include <LuaSpore/SporeDetours.h>
+#include <LuaSpore/LuaSporeCallbacks.h>
 
 virtual_detour(ProcessLine, App::cCheatManager, App::ICheatManager, bool(const char*))
 {
 	bool detoured(const char* pString)
 	{
+		LUA_THREAD_SAFETY();
+
 		bool success = false;
 
 		const auto& lua_spore = GetLuaSpore();
@@ -36,17 +55,17 @@ virtual_detour(ProcessLine, App::cCheatManager, App::ICheatManager, bool(const c
 	static inline sol::function sExecuteCheatCommand;
 };
 
-void LuaConsole::AttachDetours()
+AddSporeDetours()
 {
 	ProcessLine::attach(GetAddress(App::cCheatManager, ProcessLine));
 }
 
-void LuaConsole::LuaInitialize(sol::state_view& s)
+OnLuaInit(sol::state_view s)
 {
 	ProcessLine::sExecuteCheatCommand = s["ExecuteCheatCommand"];
 }
 
-void LuaConsole::LuaDispose(sol::state_view& s)
+OnLuaDispose(sol::state_view s)
 {
 	ProcessLine::sExecuteCheatCommand.reset();
 }

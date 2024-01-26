@@ -1,9 +1,9 @@
 /****************************************************************************
-* Copyright (C) 2022 Zarklord
+* Copyright (C) 2023-2024 Zarklord
 *
-* This file is part of UniversalPropertyEnhancer.
+* This file is part of Spore LuaAPI.
 *
-* UniversalPropertyEnhancer is free software: you can redistribute it and/or modify
+* Spore LuaAPI is free software: you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by
 * the Free Software Foundation, either version 3 of the License, or
 * (at your option) any later version.
@@ -14,7 +14,7 @@
 * GNU General Public License for more details.
 *
 * You should have received a copy of the GNU General Public License
-* along with UniversalPropertyEnhancer.  If not, see <http://www.gnu.org/licenses/>.
+* along with Spore LuaAPI.  If not, see <http://www.gnu.org/licenses/>.
 ****************************************************************************/
 
 #pragma once
@@ -93,6 +93,11 @@ namespace Extensions
 				return mpData;
 			}
 			return this;
+		}
+
+		void Clear(const bool arg_0)
+		{
+			App::Property::Clear(arg_0);
 		}
 
 		struct smfx_array_string_8
@@ -189,4 +194,22 @@ inline Extensions::Property& sol_lua_get(sol::types<Extensions::Property>, lua_S
 inline int sol_lua_push(lua_State* L, Extensions::Property& prop)
 {
 	return sol::stack::push(L, static_cast<App::Property>(prop));
+}
+
+template <typename Handler>
+inline bool sol_lua_check(sol::types<Extensions::Property*>, lua_State* L, int index, Handler&& handler, sol::stack::record& tracking)
+{
+	tracking.use(1);
+	return sol::stack::check<App::Property*>(L, lua_absindex(L, index), handler);
+}
+
+inline Extensions::Property* sol_lua_get(sol::types<Extensions::Property*>, lua_State* L, int index, sol::stack::record& tracking)
+{
+	tracking.use(1);
+	return GetPropertyExt(sol::stack::get<App::Property*>(L, lua_absindex(L, index)));
+} 
+
+inline int sol_lua_push(lua_State* L, Extensions::Property* prop)
+{
+	return sol::stack::push(L, static_cast<App::Property*>(prop));
 }

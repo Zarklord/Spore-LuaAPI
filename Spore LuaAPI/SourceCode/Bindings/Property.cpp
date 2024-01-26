@@ -1,9 +1,27 @@
+/****************************************************************************
+* Copyright (C) 2023-2024 Zarklord
+*
+* This file is part of Spore LuaAPI.
+*
+* Spore LuaAPI is free software: you can redistribute it and/or modify
+* it under the terms of the GNU General Public License as published by
+* the Free Software Foundation, either version 3 of the License, or
+* (at your option) any later version.
+*
+* This program is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+* GNU General Public License for more details.
+*
+* You should have received a copy of the GNU General Public License
+* along with Spore LuaAPI.  If not, see <http://www.gnu.org/licenses/>.
+****************************************************************************/
+
 #include <pch.h>
 
 #ifdef LUAAPI_DLL_EXPORT
 
-#include <LuaSpore/LuaBinding.h>
-#include <LuaSpore/SporeInitializer.h>
+#include <LuaSpore/LuaSporeCallbacks.h>
 #include <LuaSpore/SporeDetours.h>
 
 #include <LuaSpore/Extensions/Property.h>
@@ -12,17 +30,24 @@ static eastl::hash_map<std::uintptr_t, size_t>* sPropertyAllocationSize;
 static PropertyListPtr sConstructedProperties = nullptr;
 static uint32_t sConstructedPropertiesID = 0;
 
-AddSporeInitializer()
+OnLuaInit(sol::state_view s)
 {
 	sConstructedProperties = new App::PropertyList();
 	sPropertyAllocationSize = new eastl::hash_map<uintptr_t, size_t>();
+}
+
+OnLuaDispose(sol::state_view s)
+{
+	sConstructedProperties.reset();
+	delete sPropertyAllocationSize;
+	sPropertyAllocationSize = nullptr;
 }
 
 member_detour(Property_Clear, App::Property, void(bool arg_0))
 {
 	void detoured(bool arg_0) {
 		const auto prop_ext = GetPropertyExt(this);
-		if (prop_ext->IsArray() && prop_ext->OwnsMemory())
+		if (prop_ext->IsArray() && prop_ext->OwnsMemory() && sPropertyAllocationSize)
 		{
 			const auto it = sPropertyAllocationSize->find(reinterpret_cast<std::uintptr_t>(prop_ext->GetDataPointer()));
 			if (it != sPropertyAllocationSize->end())
@@ -44,6 +69,11 @@ static bool function_name(const App::PropertyType prop_type, args)							  \
 {																							  \
 	switch(prop_type)																		  \
 	{																						  \
+		case App::PropertyType::Void:														  \
+		{																					  \
+			property_type_function<void>(arg_names);										  \
+			return true;																	  \
+		}																					  \
 		case App::PropertyType::Bool:														  \
 		{																					  \
 			property_type_function<bool>(arg_names);										  \
@@ -81,7 +111,7 @@ static bool function_name(const App::PropertyType prop_type, args)							  \
 		}																					  \
 		case App::PropertyType::Text:														  \
 		{																					  \
-			property_type_function<LocalizedString>(arg_names);								  \
+			property_type_function<App::Property::TextProperty>(arg_names);					  \
 			return true;																	  \
 		}																					  \
 		case App::PropertyType::Vector2:													  \
@@ -127,6 +157,10 @@ static size_t GetPropertyTypeSize(const App::PropertyType prop_type)
 {
 	switch(prop_type)
 	{
+		case App::PropertyType::Void:
+		{
+			return 0;
+		}
 		case App::PropertyType::Bool:
 		{
 			return sizeof(bool);
@@ -157,7 +191,7 @@ static size_t GetPropertyTypeSize(const App::PropertyType prop_type)
 		}
 		case App::PropertyType::Text:
 		{
-			return sizeof(LocalizedString);
+			return sizeof(App::Property::TextProperty);
 		}
 		case App::PropertyType::Vector2:
 		{
@@ -199,6 +233,11 @@ static void SetSingleProperty(App::Property* prop, const App::PropertyType prop_
 	prop->Set(prop_type, prop_flags, &value, sizeof(T), 1);
 }
 template <>
+static void SetSingleProperty<void>(App::Property* prop, const App::PropertyType prop_type, const short prop_flags)
+{
+	prop->Set(prop_type, 0, nullptr, 0, 0);
+}
+template <>
 static void SetSingleProperty<eastl::string8>(App::Property* prop, const App::PropertyType prop_type, const short prop_flags)
 {
 	if constexpr(sizeof(eastl::string8) >= 0x10) assert(false);
@@ -222,7 +261,32 @@ static void SetPropertyArrayDefault(void* void_value_ptr, size_t start_index, si
 		new(static_cast<T*>(void_value_ptr) + i) T();
 	}
 }
+template <>
+static void SetPropertyArrayDefault<void>(void* void_value_ptr, size_t start_index, size_t end_index)
+{
+}
 MakePropertyTypeFunction(SetPropertyTypeArrayDefault, SetPropertyArrayDefault, Args(void* void_value_ptr, size_t start_index, size_t end_index), Args(void_value_ptr, start_index, end_index))
+
+static void PropertySetType(Extensions::Property& property, const App::PropertyType prop_type, sol::optional<size_t> count)
+{
+	property.Clear(false);
+
+	const auto prop_value_count = count.value_or(1);
+	const auto prop_type_size = GetPropertyTypeSize(prop_type);
+	if ((prop_type_size == 0 || (prop_value_count == 1 && prop_type_size < 0x10)) && SetSinglePropertyType(prop_type, property))
+	{
+		return;
+	}
+
+	auto* data = new char[prop_type_size * prop_value_count];
+	SetPropertyTypeArrayDefault(prop_type, data, 0, prop_value_count);
+
+	constexpr auto flags = static_cast<short>(
+		Extensions::Property::kPropertyFlagCleanup |
+		Extensions::Property::kPropertyFlagPointer
+	);
+	property.Set(prop_type, flags, data, prop_type_size, prop_value_count);
+}
 
 static App::Property& PropertyLuaConstructor(const App::PropertyType prop_type, sol::optional<size_t> count)
 {
@@ -235,21 +299,7 @@ static App::Property& PropertyLuaConstructor(const App::PropertyType prop_type, 
 		sConstructedProperties->GetProperty(sConstructedPropertiesID, prop);
 		++sConstructedPropertiesID;
 	}
-	const auto prop_value_count = count.value_or(1);
-	const auto prop_type_size = GetPropertyTypeSize(prop_type);
-	if (prop_value_count == 1 && prop_type_size < 0x10 && SetSinglePropertyType(prop_type, prop))
-	{
-		return *prop;
-	}
-
-	auto* data = new char[prop_type_size * prop_value_count];
-	SetPropertyTypeArrayDefault(prop_type, data, 0, prop_value_count);
-
-	constexpr auto flags = static_cast<short>(
-		Extensions::Property::kPropertyFlagCleanup |
-		Extensions::Property::kPropertyFlagPointer
-	);
-	prop->Set(prop_type, flags, data, prop_type_size, prop_value_count);
+	PropertySetType(GetPropertyExt(*prop), prop_type, count);
 	return *prop;
 }
 
@@ -376,11 +426,6 @@ static void PropertyLuaSet(sol::this_state L, Extensions::Property& property, si
 			break;
 		}
 		case App::PropertyType::Text:
-		{
-			auto* value_ptr = static_cast<LocalizedString*>(void_value_ptr);
-			value_ptr[idx] = value.as<LocalizedString>();
-			break;
-		}
 		case App::PropertyType::Bool:
 		case App::PropertyType::Int32:
 		case App::PropertyType::UInt32:
@@ -451,58 +496,58 @@ static sol::object PropertyLuaGet(sol::this_state L, Extensions::Property& prope
 			else
 			{
 				const auto* value_ptr = static_cast<const eastl::string8*>(void_value_ptr);
-				return sol::make_object(L, value_ptr[idx].c_str());
+				return sol::make_object(L, value_ptr[idx]);
 			}
 		}
 		case App::PropertyType::String16:
 		{
 			const auto* value_ptr = static_cast<const eastl::string16*>(void_value_ptr);
-			return sol::make_object(L, value_ptr[idx].c_str());
+			return sol::make_object(L, value_ptr[idx]);
 		}
 		case App::PropertyType::Key:
 		{
 			auto* value_ptr = static_cast<ResourceKey*>(void_value_ptr);
-			return sol::make_object(L, value_ptr[idx]);
+			return sol::make_object(L, value_ptr + idx);
 		}
 		case App::PropertyType::Text:
 		{
-			auto* value_ptr = static_cast<LocalizedString*>(void_value_ptr);
-			return sol::make_object(L, value_ptr[idx]);
+			auto* value_ptr = static_cast<App::Property::TextProperty*>(void_value_ptr);
+			return sol::make_object(L, value_ptr + idx);
 		}
 		case App::PropertyType::Vector2:
 		{
 			auto* value_ptr = static_cast<Vector2*>(void_value_ptr);
-			return sol::make_object(L, value_ptr[idx]);
+			return sol::make_object(L, value_ptr + idx);
 		}
 		case App::PropertyType::Vector3:
 		{
 			auto* value_ptr = static_cast<Vector3*>(void_value_ptr);
-			return sol::make_object(L, value_ptr[idx]);
+			return sol::make_object(L, value_ptr + idx);
 		}
 		case App::PropertyType::ColorRGB:
 		{
 			auto* value_ptr = static_cast<ColorRGB*>(void_value_ptr);
-			return sol::make_object(L, value_ptr[idx]);
+			return sol::make_object(L, value_ptr + idx);
 		}
 		case App::PropertyType::Vector4:
 		{
 			auto* value_ptr = static_cast<Vector4*>(void_value_ptr);
-			return sol::make_object(L, value_ptr[idx]);
+			return sol::make_object(L, value_ptr + idx);
 		}
 		case App::PropertyType::ColorRGBA:
 		{
 			auto* value_ptr = static_cast<ColorRGBA*>(void_value_ptr);
-			return sol::make_object(L, value_ptr[idx]);
+			return sol::make_object(L, value_ptr + idx);
 		}
 		case App::PropertyType::Transform:
 		{
 			auto* value_ptr = static_cast<Transform*>(void_value_ptr);
-			return sol::make_object(L, value_ptr[idx]);
+			return sol::make_object(L, value_ptr + idx);
 		}
 		case App::PropertyType::BBox:
 		{
 			auto* value_ptr = static_cast<BoundingBox*>(void_value_ptr);
-			return sol::make_object(L, value_ptr[idx]);
+			return sol::make_object(L, value_ptr + idx);
 		}
 		default:
 		{
@@ -516,14 +561,111 @@ static size_t PropertyLuaLength(const Extensions::Property& property)
 	return property.IsArray() ? property.GetItemCount() : 1u;
 }
 
-AddLuaBinding(sol::state_view s)
+static void PropertyLuaCopyFrom(Extensions::Property& base_prop, Extensions::Property& copy_prop)
+{
+	base_prop.Clear(false);
+	
+	constexpr short clear_flags = Extensions::Property::kPropertyFlagSkipDealloc | Extensions::Property::kPropertyFlagPointer | Extensions::Property::kPropertyFlagUnk8;
+	constexpr short add_flags =  Extensions::Property::kPropertyFlagCleanup;
+	const auto new_flags = static_cast<short>((copy_prop.mnFlags & ~clear_flags) | add_flags);
+
+	static auto type_size = GetPropertyTypeSize(copy_prop.mnType);
+	static auto type_count = PropertyLuaLength(copy_prop);
+
+	char* copy_memory = static_cast<char*>(copy_prop.GetValuePointer());
+	char* value_memory = new char[type_size* type_count];
+
+	switch(copy_prop.mnType)
+	{
+		case App::PropertyType::String8:
+		{
+			const auto* copy_string8_memory = reinterpret_cast<eastl::string8*>(copy_memory);
+			auto* value_string8_memory = reinterpret_cast<eastl::string8*>(value_memory);
+			for (size_t i = 0; i < type_count; ++i)
+			{
+				new(value_string8_memory + i) eastl::string8(copy_string8_memory[i]);
+			}
+			break;
+		}
+		case App::PropertyType::String16:
+		{
+			const auto* copy_string16_memory = reinterpret_cast<eastl::string16*>(copy_memory);
+			auto* value_string16_memory = reinterpret_cast<eastl::string16*>(value_memory);
+			for (size_t i = 0; i < type_count; ++i)
+			{
+				new(value_string16_memory + i) eastl::string16(copy_string16_memory[i]);
+			}
+			break;
+		}
+		case App::PropertyType::Text:
+		case App::PropertyType::Bool:
+		case App::PropertyType::Int32:
+		case App::PropertyType::UInt32:
+		case App::PropertyType::Float:
+		case App::PropertyType::Key:
+		case App::PropertyType::Vector2:
+		case App::PropertyType::Vector3:
+		case App::PropertyType::ColorRGB:
+		case App::PropertyType::Vector4:
+		case App::PropertyType::ColorRGBA:
+		case App::PropertyType::Transform:
+		case App::PropertyType::BBox:
+		{
+			memcpy(value_memory, copy_memory, type_size*type_count);
+			break;
+		}
+		default:
+		{
+			break;
+		}
+	}
+
+	base_prop.Set(
+		copy_prop.mnType,
+		new_flags,
+		value_memory,
+		type_size,
+		type_count
+	);
+	
+	if ((base_prop.mnFlags & Extensions::Property::kPropertyFlagPointer) == 0)
+	{
+		delete[] value_memory;
+	}
+}
+
+static void PropertyLuaReferenceFrom(Extensions::Property& base_prop, Extensions::Property& reference_prop)
+{
+	base_prop.Clear(false);
+	
+	constexpr short clear_flags = Extensions::Property::kPropertyFlagCleanup | Extensions::Property::kPropertyFlagUnk8;
+	constexpr short add_flags = Extensions::Property::kPropertyFlagPointer | Extensions::Property::kPropertyFlagSkipDealloc;
+	const auto new_flags = static_cast<short>((reference_prop.mnFlags & ~clear_flags) | add_flags);
+
+	static auto type_size = GetPropertyTypeSize(reference_prop.mnType);
+	static auto type_count = PropertyLuaLength(reference_prop);
+
+	base_prop.Set(
+		reference_prop.mnType,
+		new_flags,
+		reference_prop.GetValuePointer(),
+		type_size,
+		type_count
+	);
+}
+
+OnLuaInit(sol::state_view s)
 {	
 	s.new_usertype<App::Property>(
 		"Property",
-		sol::call_constructor, sol::factories(PropertyLuaConstructor),
+		sol::call_constructor, sol::factories(PropertyLuaConstructor	),
 		"IsArray", [](const Extensions::Property& property)
 		{
 			return property.IsArray();
+		},
+		"GetPropertyType", [](const Extensions::Property& property)
+		{
+			return property.mnType;
 		},
 		sol::meta_function::length, PropertyLuaLength,
 		"GetItemCount", PropertyLuaLength,
@@ -534,7 +676,10 @@ AddLuaBinding(sol::state_view s)
 		{
 			PropertyLuaSet(L, property, 1, value);
 		},
-		"Reserve", PropertyLuaReserve
+		"Reserve", PropertyLuaReserve,
+		"SetType", PropertySetType,
+		"CopyFrom", PropertyLuaCopyFrom,
+		"ReferenceFrom", PropertyLuaReferenceFrom
 	);
 }
 

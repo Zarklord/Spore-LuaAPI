@@ -19,26 +19,48 @@
 
 #include <pch.h>
 
+#include "Spore/App/cPropManager.h"
+
 #ifdef LUAAPI_DLL_EXPORT
 
-#include <LuaSpore/LuaSpore.h>
+#include <LuaSpore/SporeDetours.h>
+#include <LuaSpore/LuaSporeCallbacks.h>
 
-static void LuaPrint(const char* str)
+virtual_detour(Initialize_detour, App::cPropManager, App::IPropManager, bool())
 {
-	ModAPI::Log("[Lua] %s", str);
+	bool detoured()
+	{
+		const bool real_initialize = !mbIsInitialized;
+
+		const bool result = original_function(this);
+
+		if (real_initialize)
+		{
+			LUA_THREAD_SAFETY();
+			sol::state_view s = GetLuaSpore().GetState();
+			s["PropManager"] = static_cast<App::IPropManager*>(this);
+			(void)sOnPropManagerInitialized();
+		}
+		return result;
+	}
+
+	static inline sol::function sOnPropManagerInitialized;
+};
+
+OnLuaPostInit(sol::state_view s)
+{
+	ModAPI::Log("baseAddress: 0x%X", baseAddress);
+	Initialize_detour::sOnPropManagerInitialized = s["OnPropManagerInitialized"];
 }
 
-static uint32_t LuaHash(const LuaFNVHash& value)
+OnLuaDispose(sol::state_view s)
 {
-	return value;
+	Initialize_detour::sOnPropManagerInitialized.reset();
 }
 
-void LuaSpore::LoadLuaGlobals(sol::state& s)
+AddSporeDetours()
 {
-	s["LuaPrint"] = LuaPrint;
-	s["fnv_id"] = LuaHash;
-	s["GAMETYPE"] = static_cast<uint32_t>(ModAPI::GetGameType());
-	s["LUA_VERSION"] = lua_version(s);
+	Initialize_detour::attach(GetAddress(App::cPropManager, Initialize));
 }
 
 #endif

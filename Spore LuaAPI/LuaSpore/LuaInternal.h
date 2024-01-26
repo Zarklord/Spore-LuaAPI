@@ -1,3 +1,22 @@
+/****************************************************************************
+* Copyright (C) 2023-2024 Zarklord
+*
+* This file is part of Spore LuaAPI.
+*
+* Spore LuaAPI is free software: you can redistribute it and/or modify
+* it under the terms of the GNU General Public License as published by
+* the Free Software Foundation, either version 3 of the License, or
+* (at your option) any later version.
+*
+* This program is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+* GNU General Public License for more details.
+*
+* You should have received a copy of the GNU General Public License
+* along with Spore LuaAPI.  If not, see <http://www.gnu.org/licenses/>.
+****************************************************************************/
+
 #pragma once
 
 #ifdef LUAAPI_DLL_EXPORT
@@ -8,26 +27,10 @@
 #define LUA_INTERNALPUBLIC private
 #endif
 
-constexpr uint32_t id(sol::string_view pStr)
+#include <mutex>
+namespace LuaAPI
 {
-	uint32_t rez = 0x811C9DC5u;
-	for (const char c : pStr)
-	{
-		// To avoid compiler warnings
-		rez = static_cast<uint32_t>(rez * static_cast<unsigned long long>(0x1000193));
-		rez ^= static_cast<uint32_t>(const_tolower(c));
-	}
-	return rez;
+	extern LUAAPI std::recursive_mutex LuaThreadGuard;
 }
 
-constexpr uint32_t id(sol::u16string_view pStr)
-{
-	uint32_t rez = 0x811C9DC5u;
-	for (const char16_t c : pStr)
-	{
-		// To avoid compiler warnings
-		rez = static_cast<uint32_t>(rez * static_cast<unsigned long long>(0x1000193));
-		rez ^= static_cast<uint32_t>(const_tolower(c));
-	}
-	return rez;
-}
+#define LUA_THREAD_SAFETY() const std::lock_guard _spore_lua_lock(LuaAPI::LuaThreadGuard)

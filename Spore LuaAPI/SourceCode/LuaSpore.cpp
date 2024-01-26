@@ -1,9 +1,28 @@
+/****************************************************************************
+* Copyright (C) 2023-2024 Zarklord
+*
+* This file is part of Spore LuaAPI.
+*
+* Spore LuaAPI is free software: you can redistribute it and/or modify
+* it under the terms of the GNU General Public License as published by
+* the Free Software Foundation, either version 3 of the License, or
+* (at your option) any later version.
+*
+* This program is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+* GNU General Public License for more details.
+*
+* You should have received a copy of the GNU General Public License
+* along with Spore LuaAPI.  If not, see <http://www.gnu.org/licenses/>.
+****************************************************************************/
+
 #include <pch.h>
+
 #ifdef LUAAPI_DLL_EXPORT
 
 #include <LuaSpore/LuaSpore.h>
-#include <LuaSpore/LuaBinding.h>
-#include <LuaSpore/LuaAPI.h>
+#include <LuaSpore/LuaSporeCallbacks.h>
 
 #include <Spore/Resource/cResourceManager.h>
 
@@ -13,33 +32,19 @@
 
 namespace LuaAPI
 {
-	constexpr int MAX_MODS = 2048;
-	eastl::fixed_vector<LuaFunction, MAX_MODS> sLuaInitFunctions;
-	eastl::fixed_vector<LuaFunction, MAX_MODS> sLuaPostInitFunctions;
-	eastl::fixed_vector<LuaFunction, MAX_MODS> sLuaDisposeFunctions;
-
-	void AddLuaInitFunction(LuaFunction f)
-	{
-		sLuaInitFunctions.push_back(f);
-	}
-	void AddLuaPostInitFunction(LuaFunction f)
-	{
-		sLuaPostInitFunctions.push_back(f);
-	}
-	void AddLuaDisposeFunction(LuaFunction f)
-	{
-		sLuaDisposeFunctions.push_back(f);
-	}
+	LUAAPI std::recursive_mutex LuaThreadGuard;
 }
 
 LuaSpore* LuaSpore::mInstance = nullptr;
 void LuaSpore::Initialize()
 {
+	LUA_THREAD_SAFETY();
 	new LuaSpore();
 }
 
 void LuaSpore::Finalize()
 {
+	LUA_THREAD_SAFETY();
 	delete mInstance;
 }
 
@@ -122,7 +127,7 @@ sol::object LuaSearcher(sol::this_state L, const sol::string_view& modulename)
 	const sol::string_view group = modulename.substr(package_end+1, group_end - (package_end+1));
 	const sol::string_view instance = modulename.substr(group_end+1);
 
-	sol::optional<sol::function> fn = LuaSpore::LoadLuaBuffer(package, group, instance);
+	sol::optional<sol::function> fn = LuaSpore::InternalLoadLuaBuffer(package, group, instance);
 	if (!fn)
 	{
 		eastl::string errmsg;
@@ -145,7 +150,7 @@ static bool SporeLuaExists(sol::this_state L, const sol::string_view& modulename
 	const sol::string_view group = modulename.substr(package_end+1, group_end - (package_end+1));
 	const sol::string_view instance = modulename.substr(group_end+1);
 
-	return LuaSpore::LuaFileExists(package, group, instance);
+	return LuaSpore::InternalLuaFileExists(package, group, instance);
 }
 
 static sol::optional<sol::function> SporeLoadLua(sol::this_state L, const sol::string_view& modulename)
@@ -161,10 +166,10 @@ static sol::optional<sol::function> SporeLoadLua(sol::this_state L, const sol::s
 	const sol::string_view group = modulename.substr(package_end+1, group_end - (package_end+1));
 	const sol::string_view instance = modulename.substr(group_end+1);
 
-	return LuaSpore::LoadLuaBuffer(package, group, instance);
+	return LuaSpore::InternalLoadLuaBuffer(package, group, instance);
 }
 
-static sol::as_table_t<eastl::vector<sol::u16string_view>> GetPackages(sol::this_state L)
+static sol::as_table_t<eastl::vector<sol::u16string_view>> SporeGetPackages()
 {
 	return sol::as_table(LuaSpore::GetPackages());
 }
@@ -193,7 +198,7 @@ LuaSpore::LuaSpore()
 	
 	mState["SporeLuaExists"] = SporeLuaExists;
 	mState["SporeLoadLua"] = SporeLoadLua;
-	mState["GetSporeDBPFNames"] = []{ return sol::as_table(GetPackages()); };
+	mState["GetSporeDBPFNames"] = SporeGetPackages;
 
 	auto package_searchers = mState["package"]["searchers"];
 	if (package_searchers.valid())
@@ -203,34 +208,23 @@ LuaSpore::LuaSpore()
 		package_searchers[4] = sol::nil;
 	}
 
-	LuaAPI::LuaBinding::ExecuteLuaBindings(mState);
-
 	LoadLuaGlobals(mState);
 
-	for (const auto function : LuaAPI::sLuaInitFunctions)
-	{
-		function(mState);
-	}
-	
-	if (!DoLuaFile("luaspore/scripts/main"))
+	LuaAPI::LuaInitializers::RunCallbacks(mState);
+
+	if (!InternalDoLuaFile("luaspore/scripts/main"))
 	{
 		return;
 	}
 
-	for (const auto function : LuaAPI::sLuaPostInitFunctions)
-	{
-		function(mState);
-	}
+	LuaAPI::LuaPostInitializers::RunCallbacks(mState);
 	
 	mLuaUpdate = mState["Update"];
 }
 
 LuaSpore::~LuaSpore()
 {
-	for (const auto function : LuaAPI::sLuaDisposeFunctions)
-	{
-		function(mState.lua_state());
-	}
+	LuaAPI::LuaDisposers::RunCallbacks(mState);
 	mInstance = nullptr;
 }
 
@@ -249,7 +243,8 @@ void LuaSpore::PostInit() const
 
 void LuaSpore::Update(double dt) const
 {
-	if (!mLuaUpdate) return;
+	if (!mLuaUpdate.valid()) return;
+	LUA_THREAD_SAFETY();
 	const auto result = mLuaUpdate(dt);
 }
 
@@ -258,7 +253,13 @@ lua_State* LuaSpore::GetLuaState() const
 	return mState.lua_state();
 }
 
-bool LuaSpore::DoLuaFile(sol::string_view file) const
+bool LuaSpore::DoLuaFile(const sol::string_view file) const
+{
+	LUA_THREAD_SAFETY();
+	return InternalDoLuaFile(file);
+}
+
+bool LuaSpore::InternalDoLuaFile(sol::string_view file) const
 {
 	ModAPI::Log("DoLuaFile %.*s.lua", static_cast<int>(file.length()), file.data());
 
@@ -273,6 +274,12 @@ bool LuaSpore::DoLuaFile(sol::string_view file) const
 }
 
 sol::optional<sol::function> LuaSpore::LoadLuaBuffer(sol::string_view package, sol::string_view group, sol::string_view instance)
+{
+	LUA_THREAD_SAFETY();
+	return InternalLoadLuaBuffer(package, group, instance);
+}
+
+sol::optional<sol::function> LuaSpore::InternalLoadLuaBuffer(sol::string_view package, sol::string_view group, sol::string_view instance)
 {
 	LuaSpore& lua_spore = GetLuaSpore();
 	eastl::vector<char*> data;
@@ -330,6 +337,12 @@ sol::optional<sol::function> LuaSpore::LoadLuaBuffer(sol::string_view package, s
 }
 
 bool LuaSpore::LuaFileExists(sol::string_view package, sol::string_view group, sol::string_view instance)
+{
+	LUA_THREAD_SAFETY();
+	return InternalLuaFileExists(package, group, instance);
+}
+
+bool LuaSpore::InternalLuaFileExists(sol::string_view package, sol::string_view group, sol::string_view instance)
 {
 	LuaSpore& lua_spore = GetLuaSpore();
 	eastl::vector<char*> data;

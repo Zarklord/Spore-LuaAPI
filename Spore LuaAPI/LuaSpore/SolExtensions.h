@@ -1,3 +1,22 @@
+/****************************************************************************
+* Copyright (C) 2023-2024 Zarklord
+*
+* This file is part of Spore LuaAPI.
+*
+* Spore LuaAPI is free software: you can redistribute it and/or modify
+* it under the terms of the GNU General Public License as published by
+* the Free Software Foundation, either version 3 of the License, or
+* (at your option) any later version.
+*
+* This program is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+* GNU General Public License for more details.
+*
+* You should have received a copy of the GNU General Public License
+* along with Spore LuaAPI.  If not, see <http://www.gnu.org/licenses/>.
+****************************************************************************/
+
 #pragma once
 
 #include "sol/sol.hpp"
@@ -7,13 +26,14 @@ template <typename Handler>
 inline bool sol_lua_check(sol::types<eastl::string>, lua_State* L, int index, Handler&& handler, sol::stack::record& tracking)
 {
 	tracking.use(1);
-	return sol::stack::check<const char*>(L, lua_absindex(L, index), handler);
+	return sol::stack::check<sol::string_view>(L, lua_absindex(L, index), handler);
 }
 
 inline eastl::string sol_lua_get(sol::types<eastl::string>, lua_State* L, int index, sol::stack::record& tracking)
 {
 	tracking.use(1);
-	return eastl::string{sol::stack::get<const char*>(L, lua_absindex(L, index))};
+	const auto str = sol::stack::get<sol::string_view>(L, lua_absindex(L, index));
+	return eastl::string{str.data(), str.length()};
 }
 
 inline int sol_lua_push(sol::types<eastl::string>, lua_State* L, const eastl::string& str)
@@ -25,13 +45,14 @@ template <typename Handler>
 inline bool sol_lua_check(sol::types<eastl::string16>, lua_State* L, int index, Handler&& handler, sol::stack::record& tracking)
 {
 	tracking.use(1);
-	return sol::stack::check<const char16_t*>(L, lua_absindex(L, index), handler);
+	return sol::stack::check<sol::u16string_view>(L, lua_absindex(L, index), handler);
 }
 
 inline eastl::string16 sol_lua_get(sol::types<eastl::string16>, lua_State* L, int index, sol::stack::record& tracking)
 {
 	tracking.use(1);
-	return eastl::string16{sol::stack::get<const char16_t*>(L, lua_absindex(L, index))};
+	const auto str = sol::stack::get<sol::u16string_view>(L, lua_absindex(L, index));
+	return eastl::string16{str.data(), str.length()};
 }
 
 inline int sol_lua_push(lua_State* L, const eastl::string16& str)
@@ -43,13 +64,14 @@ template <typename Handler>
 inline bool sol_lua_check(sol::types<eastl::string32>, lua_State* L, int index, Handler&& handler, sol::stack::record& tracking)
 {
 	tracking.use(1);
-	return sol::stack::check<const char32_t*>(L, lua_absindex(L, index), handler);
+	return sol::stack::check<sol::u32string_view>(L, lua_absindex(L, index), handler);
 }
 
 inline eastl::string32 sol_lua_get(sol::types<eastl::string32>, lua_State* L, int index, sol::stack::record& tracking)
 {
 	tracking.use(1);
-	return eastl::string32{sol::stack::get<const char32_t*>(L, lua_absindex(L, index))};
+	const auto str = sol::stack::get<sol::u32string_view>(L, lua_absindex(L, index));
+	return eastl::string32{str.data(), str.length()};
 }
 
 inline int sol_lua_push(lua_State* L, const eastl::string32& str)
@@ -61,13 +83,14 @@ template <typename Handler>
 inline bool sol_lua_check(sol::types<eastl::wstring>, lua_State* L, int index, Handler&& handler, sol::stack::record& tracking)
 {
 	tracking.use(1);
-	return sol::stack::check<const wchar_t*>(L, lua_absindex(L, index), handler);
+	return sol::stack::check<sol::wstring_view>(L, lua_absindex(L, index), handler);
 }
 
 inline eastl::wstring sol_lua_get(sol::types<eastl::wstring>, lua_State* L, int index, sol::stack::record& tracking)
 {
 	tracking.use(1);
-	return eastl::wstring{sol::stack::get<const wchar_t*>(L, lua_absindex(L, index))};
+	const auto str = sol::stack::get<sol::wstring_view>(L, lua_absindex(L, index));
+	return eastl::wstring{str.data(), str.length()};
 }
 
 inline int sol_lua_push(lua_State* L, const eastl::wstring& str)
@@ -75,9 +98,38 @@ inline int sol_lua_push(lua_State* L, const eastl::wstring& str)
 	return sol::stack::push(L, str.c_str());
 }
 
+
+constexpr uint32_t id(sol::string_view pStr)
+{
+	uint32_t rez = 0x811C9DC5u;
+	for (const char c : pStr)
+	{
+		// To avoid compiler warnings
+		rez = static_cast<uint32_t>(rez * static_cast<unsigned long long>(0x1000193));
+		rez ^= static_cast<uint32_t>(const_tolower(c));
+	}
+	return rez;
+}
+
+constexpr uint32_t id(sol::u16string_view pStr)
+{
+	uint32_t rez = 0x811C9DC5u;
+	for (const char16_t c : pStr)
+	{
+		// To avoid compiler warnings
+		rez = static_cast<uint32_t>(rez * static_cast<unsigned long long>(0x1000193));
+		rez ^= static_cast<uint32_t>(const_tolower(c));
+	}
+	return rez;
+}
+
 class LuaFNVHash
 {
 public:
+	LuaFNVHash()
+	: mHash(0)
+	{
+	}
 	explicit LuaFNVHash(uint32_t hash)
 	: mHash(hash)
 	{
@@ -90,6 +142,30 @@ public:
 	: mHash(id(hash))
 	{
 	}
+	explicit LuaFNVHash(sol::string_view hash)
+	: mHash(id(hash))
+	{
+	}
+	explicit LuaFNVHash(sol::u16string_view hash)
+	: mHash(id(hash))
+	{
+	}
+	LuaFNVHash& operator=(uint32_t hash)
+	{
+		mHash = hash;
+		return *this; 
+	}
+	LuaFNVHash& operator=(const char* hash)
+	{
+		mHash = id(hash);
+		return *this; 
+	}
+	LuaFNVHash& operator=(const char16_t* hash)
+	{
+		mHash = id(hash);
+		return *this; 
+	}
+
 	operator uint32_t() const
 	{
 		return mHash;
@@ -105,21 +181,33 @@ private:
 template <typename Handler>
 inline bool sol_lua_check(sol::types<LuaFNVHash>, lua_State* L, int index, Handler&& handler, sol::stack::record& tracking)
 {
+	const auto abs_index = lua_absindex(L, index);
 	tracking.use(1);
-	return sol::stack::multi_check<uint32_t, const char*, const char16_t*>(L, lua_absindex(L, index), handler);
+	const bool success = sol::stack::check<uint32_t>(L, abs_index, &sol::no_panic) ||
+		sol::stack::check<sol::string_view>(L, abs_index, &sol::no_panic) ||
+		sol::stack::check<sol::u16string_view>(L, abs_index, &sol::no_panic);
+	if (!success)
+	{
+		luaL_error(L, "expected %s or %s, received %s",
+			lua_typename(L, static_cast<int>(sol::type::number)),
+			lua_typename(L, static_cast<int>(sol::type::string)),
+			lua_typename(L, lua_type(L, abs_index)));
+		return false;
+	}
+	return true;
 }
 
 inline LuaFNVHash sol_lua_get(sol::types<LuaFNVHash>, lua_State* L, int index, sol::stack::record& tracking)
 {
-	tracking.use(1);
 	const auto abs_index = lua_absindex(L, index);
-	if (sol::stack::check<const char*>(L, abs_index))
+	tracking.use(1);
+	if (const auto char_value = sol::stack::check_get<sol::string_view>(L, abs_index))
 	{
-		return LuaFNVHash(sol::stack::get<const char*>(L, abs_index));
+		return LuaFNVHash(char_value.value());
 	}
-	if (sol::stack::check<const char16_t*>(L, abs_index))
+	if (const auto char16_value = sol::stack::check_get<sol::u16string_view>(L, abs_index))
 	{
-		return LuaFNVHash(sol::stack::get<const char16_t*>(L, abs_index));
+		return LuaFNVHash(char16_value.value());
 	}
 	return LuaFNVHash(sol::stack::get<uint32_t>(L, abs_index));
 }

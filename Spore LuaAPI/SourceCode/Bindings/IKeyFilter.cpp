@@ -17,6 +17,17 @@
 * along with Spore LuaAPI.  If not, see <http://www.gnu.org/licenses/>.
 ****************************************************************************/
 
-#pragma once
+#include <pch.h>
+#ifdef LUAAPI_DLL_EXPORT
 
-#include <SDKDDKVer.h>
+#include <LuaSpore/LuaSporeCallbacks.h>
+
+OnLuaInit(sol::state_view s)
+{
+	s.new_usertype<Resource::IKeyFilter>(
+		"IKeyFilter",
+		"IsValid", &Resource::IKeyFilter::IsValid
+	);
+}
+
+#endif

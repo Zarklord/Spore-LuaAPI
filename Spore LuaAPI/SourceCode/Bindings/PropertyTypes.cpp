@@ -1,10 +1,29 @@
+/****************************************************************************
+* Copyright (C) 2023-2024 Zarklord
+*
+* This file is part of Spore LuaAPI.
+*
+* Spore LuaAPI is free software: you can redistribute it and/or modify
+* it under the terms of the GNU General Public License as published by
+* the Free Software Foundation, either version 3 of the License, or
+* (at your option) any later version.
+*
+* This program is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+* GNU General Public License for more details.
+*
+* You should have received a copy of the GNU General Public License
+* along with Spore LuaAPI.  If not, see <http://www.gnu.org/licenses/>.
+****************************************************************************/
+
 #include "pch.h"
 
 #ifdef LUAAPI_DLL_EXPORT
 
-#include <LuaSpore\LuaBinding.h>
+#include <LuaSpore/LuaSporeCallbacks.h>
 
-AddLuaBinding(sol::state_view s)
+OnLuaInit(sol::state_view s)
 {
 	s.new_usertype<ResourceKey>(
 		"ResourceKey",
@@ -19,27 +38,35 @@ AddLuaBinding(sol::state_view s)
 		"type_id", &ResourceKey::typeID
 	);
 
+	s.new_usertype<App::Property::TextProperty>(
+		"TextProperty",
+		sol::no_constructor,
+		"table_id", sol::readonly(&App::Property::TextProperty::tableID),
+		"instance_id", sol::readonly(&App::Property::TextProperty::instanceID),
+		"buffer", sol::readonly(&App::Property::TextProperty::buffer)
+	);
+
 	s.new_usertype<LocalizedString>(
 		"LocalizedString",
 		sol::call_constructor, sol::initializers(
-			[](LocalizedString* memory, const LuaFNVHash& tableID, const LuaFNVHash& instanceID)
+			[](LocalizedString* memory, const LuaFNVHash& tableID, const LuaFNVHash& instanceID, sol::optional<const char16_t*> text)
 			{
-				new(memory) LocalizedString(tableID, instanceID);
-			}, 
-			[](LocalizedString* memory, const LuaFNVHash& tableID, const LuaFNVHash& instanceID, const char16_t* text)
+				new(memory) LocalizedString(tableID, instanceID, text.value_or(nullptr));
+			},
+			[](LocalizedString* memory, const App::Property::TextProperty& text)
 			{
-				new(memory) LocalizedString(tableID, instanceID, text);
+				new(memory) LocalizedString(text.tableID, text.instanceID);
 			}
 		),
 		"GetText", &LocalizedString::GetText,
 		"SetText", sol::overload(
-			[](LocalizedString& str, const LuaFNVHash& tableID, const LuaFNVHash& instanceID)
+			[](LocalizedString& str, const LuaFNVHash& tableID, const LuaFNVHash& instanceID, sol::optional<const char16_t*> text)
 			{
-				str.SetText(tableID, instanceID);
+				str.SetText(tableID, instanceID, text.value_or(nullptr));
 			},
-			[](LocalizedString& str, const LuaFNVHash& tableID, const LuaFNVHash& instanceID, const char16_t* text)
+			[](LocalizedString& str, const App::Property::TextProperty& text)
 			{
-				str.SetText(tableID, instanceID, text);
+				str.SetText(text.tableID, text.instanceID);
 			}
 		)
 	);

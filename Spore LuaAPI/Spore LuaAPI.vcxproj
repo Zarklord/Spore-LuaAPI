@@ -201,6 +201,7 @@
     <None Include="SdkPathConfig.props" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="SourceCode\Bindings\IKeyFilter.cpp" />
     <ClCompile Include="SourceCode\Bindings\PropertyList.cpp" />
     <ClCompile Include="SourceCode\Bindings\Property.cpp" />
     <ClCompile Include="SourceCode\Bindings\PropertyTypes.cpp" />
@@ -213,26 +214,23 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release DLL|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug DLL|Win32'">Create</PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="SourceCode\GameEvents\InitializePropManager.cpp" />
     <ClCompile Include="SourceCode\SporeDetours.cpp" />
-    <ClCompile Include="SourceCode\LuaBinding.cpp" />
+    <ClCompile Include="SourceCode\LuaSporeCallbacks.cpp" />
     <ClCompile Include="SourceCode\LuaGlobals.cpp" />
-    <ClCompile Include="SourceCode\SporeInitializer.cpp" />
     <ClCompile Include="SourceCode\LuaSpore.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="LuaSpore\SporeDetours.h" />
-    <ClInclude Include="LuaSpore\LuaBinding.h" />
+    <ClInclude Include="LuaSpore\LuaSporeCallbacks.h" />
     <ClInclude Include="LuaSpore\DefaultIncludes.h" />
     <ClInclude Include="LuaSpore\Extensions\Property.h" />
-    <ClInclude Include="LuaSpore\LuaAPI.h" />
-    <ClInclude Include="LuaSpore\SporeInitializer.h" />
     <ClInclude Include="LuaSpore\LuaInternal.h" />
     <ClInclude Include="LuaSpore\LuaSpore.h" />
     <ClInclude Include="LuaSpore\SolExtensions.h" />
     <ClInclude Include="sol\config.hpp" />
     <ClInclude Include="sol\forward.hpp" />
     <ClInclude Include="sol\sol.hpp" />
-    <ClInclude Include="SourceCode\DLL\LuaConsole.h" />
     <ClInclude Include="SourceCode\DLL\pch.h" />
     <ClInclude Include="SourceCode\DLL\targetver.h" />
   </ItemGroup>

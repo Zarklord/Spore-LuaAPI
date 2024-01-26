@@ -69,7 +69,7 @@ end
 
 function RunInEnvironment(fn, fnenv)
 	setfenv(fn, fnenv)
-	return xpcall(fn, debug.traceback)
+	return xpcall(fn, function(message) print(debug.traceback(message), 2) end)
 end
 
 function FunctionOrValue(func_or_val, ...)
@@ -77,4 +77,20 @@ function FunctionOrValue(func_or_val, ...)
         return func_or_val(...)
     end
     return func_or_val
+end
+
+function GenerateCallbackExecuter()
+    local callbacks = {}
+    local function AddCallback(callback)
+        callbacks[callback] = true
+    end
+    local function RemoveCallback(callback)
+        callbacks[callback] = false
+    end
+    local function ExecuteCallbacks(...)
+        for callback in pairs(callbacks) do
+            callback(...)
+        end
+    end
+    return AddCallback, RemoveCallback, ExecuteCallbacks
 end

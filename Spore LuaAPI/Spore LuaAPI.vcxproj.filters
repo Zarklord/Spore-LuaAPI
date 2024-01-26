@@ -39,7 +39,10 @@
     <ClCompile Include="SourceCode\Bindings\PropertyList.cpp" />
     <ClCompile Include="SourceCode\Bindings\Property.cpp" />
     <ClCompile Include="SourceCode\Bindings\PropertyTypes.cpp" />
-    <ClCompile Include="SourceCode\LuaBinding.cpp" />
+    <ClCompile Include="SourceCode\LuaSporeCallbacks.cpp" />
+    <ClCompile Include="SourceCode\SporeDetours.cpp" />
+    <ClCompile Include="SourceCode\Bindings\IKeyFilter.cpp" />
+    <ClCompile Include="SourceCode\GameEvents\InitializePropManager.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="SourceCode\DLL\pch.h">
@@ -54,18 +57,15 @@
     <ClInclude Include="LuaSpore\LuaInternal.h">
       <Filter>LuaSpore</Filter>
     </ClInclude>
-    <ClInclude Include="SourceCode\DLL\LuaConsole.h">
-      <Filter>SourceCode\DLL</Filter>
-    </ClInclude>
     <ClInclude Include="LuaSpore\DefaultIncludes.h">
       <Filter>LuaSpore</Filter>
     </ClInclude>
-    <ClInclude Include="LuaSpore\LuaAPI.h" />
     <ClInclude Include="LuaSpore\Extensions\Property.h" />
     <ClInclude Include="sol\config.hpp" />
     <ClInclude Include="sol\forward.hpp" />
     <ClInclude Include="sol\sol.hpp" />
     <ClInclude Include="LuaSpore\SolExtensions.h" />
-    <ClInclude Include="LuaSpore\LuaBinding.h" />
+    <ClInclude Include="LuaSpore\LuaSporeCallbacks.h" />
+    <ClInclude Include="LuaSpore\SporeDetours.h" />
   </ItemGroup>
 </Project>
