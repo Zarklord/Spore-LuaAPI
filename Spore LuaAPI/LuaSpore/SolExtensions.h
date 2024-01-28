@@ -188,10 +188,7 @@ inline bool sol_lua_check(sol::types<LuaFNVHash>, lua_State* L, int index, Handl
 		sol::stack::check<sol::u16string_view>(L, abs_index, &sol::no_panic);
 	if (!success)
 	{
-		luaL_error(L, "expected %s or %s, received %s",
-			lua_typename(L, static_cast<int>(sol::type::number)),
-			lua_typename(L, static_cast<int>(sol::type::string)),
-			lua_typename(L, lua_type(L, abs_index)));
+		handler(L, index, sol::type::number, sol::type_of(L, abs_index), "[expected number or fnv_hashable type]");
 		return false;
 	}
 	return true;

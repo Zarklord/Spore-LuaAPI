@@ -32,7 +32,7 @@
 
 namespace LuaAPI
 {
-	LUAAPI std::recursive_mutex LuaThreadGuard;
+	LUAAPI CriticalSection LuaThreadGuard;
 }
 
 LuaSpore* LuaSpore::mInstance = nullptr;

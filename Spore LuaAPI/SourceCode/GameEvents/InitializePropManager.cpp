@@ -44,12 +44,11 @@ virtual_detour(Initialize_detour, App::cPropManager, App::IPropManager, bool())
 		return result;
 	}
 
-	static inline sol::function sOnPropManagerInitialized;
+	static inline sol::unsafe_function sOnPropManagerInitialized;
 };
 
 OnLuaPostInit(sol::state_view s)
 {
-	ModAPI::Log("baseAddress: 0x%X", baseAddress);
 	Initialize_detour::sOnPropManagerInitialized = s["OnPropManagerInitialized"];
 }
 
