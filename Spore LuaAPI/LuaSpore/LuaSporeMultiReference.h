@@ -23,28 +23,40 @@ template <typename T>
 class LuaMultiReference
 {
 	using reference = pair<lua_State*, T>;
-	vector<reference> references;
+	vector<reference>* references = nullptr;
 public:
 	void clear(lua_State* L)
 	{
-		auto end = references.end();
-		auto it = eastl::remove_if(references.begin(), end, [L](reference ref)
+		if (!references) return;
+
+		auto end = references->end();
+		auto it = eastl::remove_if(references->begin(), end, [L](reference ref)
 		{
 			return ref.first == L;
 		});
 
 		if (it != end)
-			references.erase(it, end);
+		{
+			references->erase(it, end);
+
+			if (references->empty())
+			{
+				delete references;
+				references = nullptr;
+			}
+		}
 	}
 
 	void set(lua_State* L, T value)
 	{
-		references.push_back(pair{L, std::move(value)});
+		if (!references) references = new vector<reference>;
+		references->push_back(pair{L, std::move(value)});
 	}
 
 	sol::optional<T> get(lua_State* L)
 	{
-		for (auto [lua_state, value] : references)
+		if (!references) return {};
+		for (auto [lua_state, value] : *references)
 		{
 			if (lua_state == L)
 			{
@@ -56,12 +68,13 @@ public:
 
 	void reset()
 	{
-		references.clear();
+		delete references;
+		references = nullptr;
 	}
 
 	bool valid() const
 	{
-		return !references.empty();
+		return references;
 	}
 
 	operator bool() const

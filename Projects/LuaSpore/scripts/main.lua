@@ -6,6 +6,6 @@ require("luaspore/scripts/scheduler")
 require("luaspore/scripts/update")
 require("luaspore/scripts/gamelogic")
 
-print.Lua("main.lua loaded with gametype: "..(GAMETYPE == GameType.Disk and "Disk" or "March2017"))
+print("main.lua loaded with gametype: "..(GAMETYPE == GameType.Disk and "Disk" or "March2017"))
 
 require("luaspore/modloader/modloader")
