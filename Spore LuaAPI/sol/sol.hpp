@@ -8024,8 +8024,8 @@ namespace sol {
 
 	typedef meta_function meta_method;
 
-	inline const std::array<std::string, 37>& meta_function_names() {
-		static const std::array<std::string, 37> names = { { "new",
+	inline const std::array<std::string_view, 37>& meta_function_names() {
+		static const std::array<std::string_view, 37> names = { { "new",
 			"__index",
 			"__newindex",
 			"__mode",
@@ -8068,7 +8068,7 @@ namespace sol {
 		return names;
 	}
 
-	inline const std::string& to_string(meta_function mf) {
+	inline const std::string_view& to_string(meta_function mf) {
 		return meta_function_names()[static_cast<std::size_t>(mf)];
 	}
 
@@ -9066,14 +9066,14 @@ namespace sol { namespace detail {
 
 	template <typename T>
 	const std::string& demangle() {
-		static const std::string d = demangle_once<T>();
-		return d;
+		static const std::string* d = new std::string(demangle_once<T>());
+		return *d;
 	}
 
 	template <typename T>
 	const std::string& short_demangle() {
-		static const std::string d = short_demangle_once<T>();
-		return d;
+		static const std::string* d = new std::string(short_demangle_once<T>());
+		return *d;
 	}
 }} // namespace sol::detail
 
@@ -9092,20 +9092,20 @@ namespace sol {
 			return q_n;
 		}
 		static const std::string& metatable() {
-			static const std::string m = std::string("sol.").append(detail::demangle<T>());
-			return m;
+			static const std::string* m = new std::string(std::string("sol.").append(detail::demangle<T>()));
+			return *m;
 		}
 		static const std::string& user_metatable() {
-			static const std::string u_m = std::string("sol.").append(detail::demangle<T>()).append(".user");
-			return u_m;
+			static const std::string* u_m = new std::string(std::string("sol.").append(detail::demangle<T>()).append(".user"));
+			return *u_m;
 		}
 		static const std::string& user_gc_metatable() {
-			static const std::string u_g_m = std::string("sol.").append(detail::demangle<T>()).append(".user\xE2\x99\xBB");
-			return u_g_m;
+			static const std::string* u_g_m = new std::string(std::string("sol.").append(detail::demangle<T>()).append(".user\xE2\x99\xBB"));
+			return *u_g_m;
 		}
 		static const std::string& gc_table() {
-			static const std::string g_t = std::string("sol.").append(detail::demangle<T>()).append(".\xE2\x99\xBB");
-			return g_t;
+			static const std::string* g_t = new std::string(std::string("sol.").append(detail::demangle<T>()).append(".\xE2\x99\xBB"));
+			return *g_t;
 		}
 	};
 
@@ -11419,7 +11419,7 @@ namespace sol {
 			indexed_insert(lua_reg_table& registration_table_, int& index_ref_) : registration_table(registration_table_), index(index_ref_) {
 			}
 			void operator()(meta_function meta_function_name_, lua_CFunction c_function_) {
-				registration_table[index] = luaL_Reg { to_string(meta_function_name_).c_str(), c_function_ };
+				registration_table[index] = luaL_Reg { to_string(meta_function_name_).data(), c_function_ };
 				++index;
 			}
 		};
@@ -12760,7 +12760,7 @@ namespace sol { namespace stack {
 						handler(L_, index, type::function, t, "value is not a function and does not have valid metatable");
 						return false;
 					}
-					lua_getfield(L_, -1, &callkey[0]);
+					lua_getfield(L_, -1, callkey.data());
 					if (lua_isnoneornil(L_, -1)) {
 						lua_pop(L_, 2);
 						handler(L_, index, type::function, t, "value's metatable does not have __call overridden in metatable, cannot call this type");
@@ -14919,7 +14919,7 @@ namespace sol { namespace stack {
 					int index = 0;
 					detail::indexed_insert insert_callable(registration_table, index);
 					detail::insert_default_registrations<element>(insert_callable, detail::property_always_true);
-					registration_table[index] = { to_string(meta_function::garbage_collect).c_str(), detail::make_destructor<T>() };
+					registration_table[index] = { to_string(meta_function::garbage_collect).data(), detail::make_destructor<T>() };
 					luaL_setfuncs(L, registration_table, 0);
 				}
 				lua_setmetatable(L, -2);
@@ -15192,7 +15192,7 @@ namespace sol { namespace stack {
 #if SOL_IS_ON(SOL_SAFE_STACK_CHECK)
 			luaL_checkstack(L, 1, detail::not_enough_stack_space_generic);
 #endif // make sure stack doesn't overflow
-			lua_pushlstring(L, to_string(meta_function::metatable).c_str(), 4);
+			lua_pushlstring(L, to_string(meta_function::metatable).data(), 4);
 			return 1;
 		}
 	};
@@ -15596,8 +15596,8 @@ namespace sol { namespace stack {
 #if SOL_IS_ON(SOL_SAFE_STACK_CHECK)
 			luaL_checkstack(L, 1, detail::not_enough_stack_space_meta_function_name);
 #endif // make sure stack doesn't overflow
-			const std::string& str = to_string(m);
-			lua_pushlstring(L, str.c_str(), str.size());
+			const std::string_view& str = to_string(m);
+			lua_pushlstring(L, str.data(), str.size());
 			return 1;
 		}
 	};
@@ -23393,7 +23393,7 @@ namespace sol {
 			detail::indexed_insert insert_fx(l, index);
 			detail::insert_default_registrations<T>(insert_fx, detail::property_always_true);
 			if constexpr (!std::is_pointer_v<X>) {
-				l[index] = luaL_Reg { to_string(meta_function::garbage_collect).c_str(), detail::make_destructor<T>() };
+				l[index] = luaL_Reg { to_string(meta_function::garbage_collect).data(), detail::make_destructor<T>() };
 			}
 			luaL_setfuncs(L, l, 0);
 
@@ -23405,7 +23405,7 @@ namespace sol {
 			lua_CFunction is_func = &detail::is_check<T>;
 			lua_pushcclosure(L, is_func, 0);
 			lua_setfield(L, -2, "is");
-			lua_setfield(L, t.stack_index(), to_string(meta_function::type).c_str());
+			lua_setfield(L, t.stack_index(), to_string(meta_function::type).data());
 
 			t.pop();
 		}
@@ -25177,7 +25177,7 @@ namespace sol { namespace stack { namespace stack_detail {
 		int metatable_exists = lua_getmetatable(L_, 1);
 		sol_c_assert(metatable_exists == 1);
 		const auto& index_key = to_string(sol::meta_function::index);
-		lua_getfield(L_, lua_gettop(L_), index_key.c_str());
+		lua_getfield(L_, lua_gettop(L_), index_key.data());
 		lua_remove(L_, -2);
 		pushed += 1;
 		pushed += stack::push(L_, lua_nil);

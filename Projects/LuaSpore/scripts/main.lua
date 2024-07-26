@@ -1,7 +1,7 @@
-require("luaspore/scripts/constants")
-require("luaspore/util/util")
+RequireOnAllThreads("luaspore/scripts/constants")
+RequireOnAllThreads("luaspore/util/util")
 
-require("luaspore/scripts/logging")
+RequireOnAllThreads("luaspore/scripts/logging")
 require("luaspore/scripts/scheduler")
 require("luaspore/scripts/update")
 require("luaspore/scripts/gamelogic")

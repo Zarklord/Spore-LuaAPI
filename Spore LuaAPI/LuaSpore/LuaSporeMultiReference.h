@@ -19,8 +19,53 @@
 
 #pragma once
 
-#include <LuaSpore/LuaInternal.h>
-#include <sol/sol.hpp>
-#include <LuaSpore/SolExtensions.h>
-#include <LuaSpore/LuaSpore.h>
-#include <LuaSpore/LuaSporeMultiReference.h>
+template <typename T>
+class LuaMultiReference
+{
+	using reference = pair<lua_State*, T>;
+	vector<reference> references;
+public:
+	void clear(lua_State* L)
+	{
+		auto end = references.end();
+		auto it = eastl::remove_if(references.begin(), end, [L](reference ref)
+		{
+			return ref.first == L;
+		});
+
+		if (it != end)
+			references.erase(it, end);
+	}
+
+	void set(lua_State* L, T value)
+	{
+		references.push_back(pair{L, std::move(value)});
+	}
+
+	sol::optional<T> get(lua_State* L)
+	{
+		for (auto [lua_state, value] : references)
+		{
+			if (lua_state == L)
+			{
+				return value;
+			}
+		}
+		return {};
+	}
+
+	void reset()
+	{
+		references.clear();
+	}
+
+	bool valid() const
+	{
+		return !references.empty();
+	}
+
+	operator bool() const
+	{
+		return valid();
+	}
+};

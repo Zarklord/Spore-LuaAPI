@@ -26,32 +26,3 @@
 #define LUAAPI __declspec(dllimport)
 #define LUA_INTERNALPUBLIC private
 #endif
-
-#include <mutex>
-namespace LuaAPI
-{
-	class LUAAPI CriticalSection
-	{
-	public:
-	    CriticalSection() {
-	        InitializeCriticalSection(&m_cs);
-	    }
-
-	    ~CriticalSection() {
-	        DeleteCriticalSection(&m_cs);
-	    }
-
-	    void lock() {
-	        EnterCriticalSection(&m_cs);
-	    }
-
-	    void unlock() {
-	        LeaveCriticalSection(&m_cs);
-	    }
-	private:
-	    CRITICAL_SECTION m_cs;
-	};
-	extern LUAAPI CriticalSection LuaThreadGuard;
-}
-
-#define LUA_THREAD_SAFETY() const std::lock_guard _spore_lua_lock(LuaAPI::LuaThreadGuard)

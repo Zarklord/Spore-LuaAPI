@@ -22,7 +22,9 @@
 #ifdef LUAAPI_DLL_EXPORT
 
 #include <LuaSpore/LuaSpore.h>
-#include <LuaSpore/SporeDetours.h>
+
+#define LUAAPI_MODNAME "SporeLuaAPI"
+#define LUAAPI_VERSION 100000
 
 void PreInitialize()
 {
@@ -53,12 +55,6 @@ member_detour(PreInit_detour, std::monostate, int(int, int))
 	}
 };
 
-void AttachDetours()
-{
-	PreInit_detour::attach(GetAddress(App::cAppSystem, PreInit));
-	LuaAPI::SporeDetours::Attach();
-}
-
 BOOL APIENTRY DllMain(HMODULE hModule, DWORD  ul_reason_for_call, LPVOID lpReserved)
 {
 	switch (ul_reason_for_call)
@@ -68,7 +64,8 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD  ul_reason_for_call, LPVOID lpReser
 		ModAPI::AddDisposeFunction(Dispose);
 
 		PrepareDetours(hModule);
-		AttachDetours();
+		PreInit_detour::attach(GetAddress(App::cAppSystem, PreInit));
+		LuaSpore::RegisterCPPMod(LUAAPI_MODNAME, LUAAPI_VERSION);
 		CommitDetours();
 		break;
 	case DLL_PROCESS_DETACH:

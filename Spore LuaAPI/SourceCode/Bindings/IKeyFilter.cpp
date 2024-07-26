@@ -22,7 +22,7 @@
 
 #include <LuaSpore/LuaSporeCallbacks.h>
 
-OnLuaInit(sol::state_view s)
+OnLuaInit(sol::state_view s, bool is_main_state)
 {
 	s.new_usertype<Resource::IKeyFilter>(
 		"IKeyFilter",

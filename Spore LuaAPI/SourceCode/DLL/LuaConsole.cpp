@@ -24,24 +24,37 @@
 #include <LuaSpore/SporeDetours.h>
 #include <LuaSpore/LuaSporeCallbacks.h>
 
+static sol::function sExecuteCheatCommand;
+
+OnLuaInit(sol::state_view s, bool is_main_state)
+{
+	if (!is_main_state) return;
+	sExecuteCheatCommand = s["ExecuteCheatCommand"];
+}
+
+OnLuaDispose(sol::state_view s, bool is_main_state)
+{
+	if (!is_main_state) return;
+	sExecuteCheatCommand.reset();
+}
+
 virtual_detour(ProcessLine, App::cCheatManager, App::ICheatManager, bool(const char*))
 {
 	bool detoured(const char* pString)
 	{
-		LUA_THREAD_SAFETY();
-
 		bool success = false;
-
-		const auto& lua_spore = GetLuaSpore();
-		auto s = lua_spore.GetState();
-		if (sExecuteCheatCommand.valid())
+		
+		if (sExecuteCheatCommand)
 		{
-			auto result = s.load_buffer(pString, strlen(pString), "CheatConsoleInput", sol::load_mode::text);
-			success = result.valid();
-			if (success)
+			GetLuaSpore().ExecuteOnMainState([&success, pString](sol::state_view s)
 			{
-				sExecuteCheatCommand(result);
-			}
+				auto result = s.load(sol::string_view(pString), "CheatConsoleInput", sol::load_mode::text);
+				success = result.valid();
+				if (success)
+				{
+					sExecuteCheatCommand(result);
+				}
+			});
 		}
 
 		if (!success)
@@ -51,23 +64,11 @@ virtual_detour(ProcessLine, App::cCheatManager, App::ICheatManager, bool(const c
 
 		return success;
 	}
-
-	static inline sol::function sExecuteCheatCommand;
 };
 
 AddSporeDetours()
 {
 	ProcessLine::attach(GetAddress(App::cCheatManager, ProcessLine));
-}
-
-OnLuaInit(sol::state_view s)
-{
-	ProcessLine::sExecuteCheatCommand = s["ExecuteCheatCommand"];
-}
-
-OnLuaDispose(sol::state_view s)
-{
-	ProcessLine::sExecuteCheatCommand.reset();
 }
 
 #endif

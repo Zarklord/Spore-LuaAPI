@@ -22,9 +22,8 @@
 
 #include <LuaSpore/LuaSporeCallbacks.h>
 
-OnLuaInit(sol::state_view s)
+OnLuaInit(sol::state_view s, bool is_main_state)
 {
-	ModAPI::Log("PropManager AddLuaBinding");
 	s.new_usertype<App::IPropManager>(
 		"IPropManager",
 		"GetPropertyListIds", [](App::IPropManager& prop_manager, const LuaFNVHash& groupID)

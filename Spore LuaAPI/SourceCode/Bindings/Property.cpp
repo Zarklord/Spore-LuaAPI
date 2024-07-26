@@ -30,14 +30,16 @@ static eastl::hash_map<std::uintptr_t, size_t>* sPropertyAllocationSize;
 static PropertyListPtr sConstructedProperties = nullptr;
 static uint32_t sConstructedPropertiesID = 0;
 
-OnLuaInit(sol::state_view s)
+OnLuaInit(sol::state_view s, bool is_main_state)
 {
+	if (!is_main_state) return;
 	sConstructedProperties = new App::PropertyList();
 	sPropertyAllocationSize = new eastl::hash_map<uintptr_t, size_t>();
 }
 
-OnLuaDispose(sol::state_view s)
+OnLuaDispose(sol::state_view s, bool is_main_state)
 {
+	if (!is_main_state) return;
 	sConstructedProperties.reset();
 	delete sPropertyAllocationSize;
 	sPropertyAllocationSize = nullptr;
@@ -654,7 +656,7 @@ static void PropertyLuaReferenceFrom(Extensions::Property& base_prop, Extensions
 	);
 }
 
-OnLuaInit(sol::state_view s)
+OnLuaInit(sol::state_view s, bool is_main_state)
 {	
 	s.new_usertype<App::Property>(
 		"Property",

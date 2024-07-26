@@ -221,6 +221,7 @@
     <ClCompile Include="SourceCode\LuaSpore.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="LuaSpore\LuaSporeMultiReference.h" />
     <ClInclude Include="LuaSpore\SporeDetours.h" />
     <ClInclude Include="LuaSpore\LuaSporeCallbacks.h" />
     <ClInclude Include="LuaSpore\DefaultIncludes.h" />

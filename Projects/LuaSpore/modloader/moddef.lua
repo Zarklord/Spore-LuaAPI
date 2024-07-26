@@ -11,16 +11,44 @@ end)
 
 function ModDefinition:LoadModInfo()
 	self.modinfo = {}
-	RunInEnvironment(SporeLoadLua(self.modinfo_path), self.modinfo)
+	local modinfo_fn = SporeLoadLua(self.modinfo_path)
+	if modinfo_fn then
+		RunInEnvironment(modinfo_fn, self.modinfo)
+	else
+		printf.ModLoader("Package %s mod/info.lua has a syntax error", self.dbpf_name)
+		self.invalid_modinfo = true
+	end
 
 	if not self.modinfo.name or
 	not self.modinfo.description or
 	not self.modinfo.version or
 	not self.modinfo.name or
 	not self.modinfo.author then
-		printf.ModLoader("Package %s had an invalid mod/info.lua", self.dbpf_name)
+		printf.ModLoader("Package %s has an invalid mod/info.lua", self.dbpf_name)
 		self.invalid_modinfo = true
 	end
+
+	if self.modinfo.base_api_version then
+		local cur_version = self.LoadedCPPMods["SporeLuaAPI"]
+		if self.modinfo.base_api_version > cur_version then
+			printf.ModLoader("Package %s could not be loaded because the SporeLuaAPI version %d is too low, expected: %d", self.dbpf_name, cur_version, self.modinfo.base_api_version)
+			self.invalid_modinfo = true
+		end
+	end
+
+	if self.modinfo.cpp_mod_requirements then
+		for modname, min_version in pairs(self.modinfo.cpp_mod_requirements) do
+			local cur_version = self.LoadedCPPMods[modname]
+			if not cur_version then
+				printf.ModLoader("Package %s could not be loaded because the cpp mod '%s' was missing", self.dbpf_name, modname)
+				self.invalid_modinfo = true
+			elseif min_version > cur_version then
+				printf.ModLoader("Package %s could not be loaded because the cpp mod '%s' version %d is too low, expected: %d", self.dbpf_name, modname, cur_version, min_version)
+				self.invalid_modinfo = true
+			end
+		end
+	end
+
 	self.priority = self.modinfo.priority or 0
 end
 
@@ -40,14 +68,28 @@ function ModDefinition:LoadMod()
 					require(path)
 				end
 			end,
+			RequireOnAllThreads = function(path)
+				if path:count("/") == 1 then
+					RequireOnAllThreads(self.dbpf_name.."/"..path)
+				else
+					RequireOnAllThreads(path)
+				end
+			end,
 		},
 		{
 			__index = _G,
 		}
 	)
 
-	RunInEnvironment(SporeLoadLua(self.modmain_path), self.mod_environment)
+	local mod_fn = SporeLoadLua(self.modmain_path)
+	if mod_fn then
+		RunInEnvironment(mod_fn, self.mod_environment)
+	else
+		printf.ModLoader("Mod: %s (%s) Failed to load mod/main.lua due to a syntax error", self.dbpf_name, self.modinfo.name)
+	end
 end
+
+ModDefinition.LoadedCPPMods = GetCPPMods()
 
 function ModDefinition.SortByPriority(a, b)
 	local apriority = a.modinfo.priority

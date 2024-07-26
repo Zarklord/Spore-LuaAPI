@@ -23,10 +23,10 @@
 
 using namespace LuaAPI;
 
-static std::vector<SporeDetoursInstance*>& GetSporeDetours()
+static vector<SporeDetoursInstance*>& GetSporeDetours()
 {
-	static std::vector<SporeDetoursInstance*> detours;
-	return detours;
+	static auto* detours = new vector<SporeDetoursInstance*>;
+	return *detours;
 }
 
 void SporeDetours::RegisterInstance(SporeDetoursInstance* detour)

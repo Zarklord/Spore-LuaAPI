@@ -24,22 +24,22 @@
 
 using namespace LuaAPI;
 
-static std::vector<LuaSporeCallbackInstance*>& GetLuaInitializers()
+static vector<LuaSporeCallbackInstance*>& GetLuaInitializers()
 {
-	static std::vector<LuaSporeCallbackInstance*> initializers;
-	return initializers;
+	static auto* initializers = new vector<LuaSporeCallbackInstance*>;
+	return *initializers;
 }
 
-static std::vector<LuaSporeCallbackInstance*>& GetLuaPostInitializers()
+static vector<LuaSporeCallbackInstance*>& GetLuaPostInitializers()
 {
-	static std::vector<LuaSporeCallbackInstance*> post_initializers;
-	return post_initializers;
+	static auto* post_initializers = new vector<LuaSporeCallbackInstance*>;
+	return *post_initializers;
 }
 
-static std::vector<LuaSporeCallbackInstance*>& GetLuaDisposers()
+static vector<LuaSporeCallbackInstance*>& GetLuaDisposers()
 {
-	static std::vector<LuaSporeCallbackInstance*> disposers;
-	return disposers;
+	static auto* disposers = new vector<LuaSporeCallbackInstance*>;
+	return *disposers;
 }
 
 void LuaInitializers::RegisterInstance(LuaSporeCallbackInstance* initializer)
@@ -57,22 +57,22 @@ void LuaDisposers::RegisterInstance(LuaSporeCallbackInstance* disposer)
 	GetLuaDisposers().push_back(disposer);	
 }
 
-void LuaInitializers::RunCallbacks(lua_State* L)
+void LuaInitializers::RunCallbacks(lua_State* L, bool is_main_state)
 {
 	for (const auto initializer : GetLuaInitializers())
-		initializer->RunCallback(L);
+		initializer->RunCallback(L, is_main_state);
 }
 
-void LuaPostInitializers::RunCallbacks(lua_State* L)
+void LuaPostInitializers::RunCallbacks(lua_State* L, bool is_main_state)
 {
 	for (const auto post_initializer : GetLuaPostInitializers())
-		post_initializer->RunCallback(L);
+		post_initializer->RunCallback(L, is_main_state);
 }
 
-void LuaDisposers::RunCallbacks(lua_State* L)
+void LuaDisposers::RunCallbacks(lua_State* L, bool is_main_state)
 {
 	for (const auto disposer : GetLuaDisposers())
-		disposer->RunCallback(L);
+		disposer->RunCallback(L, is_main_state);
 }
 
 #endif

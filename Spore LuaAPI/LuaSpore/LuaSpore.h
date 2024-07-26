@@ -20,21 +20,85 @@
 #pragma once
 
 #include <LuaSpore/LuaInternal.h>
-#include <LuaSpore/DefaultIncludes.h>
+
+#include <mutex>
+
+#include "SporeDetours.h"
 
 class LuaSpore
 {
 public:
-	LUAAPI [[nodiscard]] lua_State* GetLuaState() const;
+	LUAAPI [[nodiscard]] static bool CanExecuteOnMainState();
+	LUAAPI [[nodiscard]] lua_State* GetMainLuaState() const;
 	//intentionally not LUAAPI, that way sol::state_view is the mod's version, and not the version in the LuaAPI
-	[[nodiscard]] sol::state_view GetState() const
+	[[nodiscard]] sol::state_view GetMainState() const
 	{
-		return {GetLuaState()};
+		return {GetMainLuaState()};
 	}
+	template <typename ExecuteOnLuaStateFn>
+	void ExecuteOnMainState(const ExecuteOnLuaStateFn fn) const
+	{
+		fn(GetMainLuaState());
+	}
+	template <typename ExecuteOnLuaStateFn>
+	void ExecuteOnFreeState(const ExecuteOnLuaStateFn fn) const
+	{
+		if (IsMainThread())
+		{
+			fn(GetMainLuaState());
+			return;	
+		}
+		const auto mutexed_state = GetFreeThreadLuaState();
+		fn(mutexed_state.state);
+	}
+	template <typename ExecuteOnLuaStateFn>
+	void ExecuteOnAllStates(const ExecuteOnLuaStateFn fn)
+	{
+		assert(IsMainThread());
+
+		LockAllThreadStates();
+		const auto* thread_states = GetThreadStateArray();
+		for (size_t i = 0; i < GetNumThreadStates(); ++i)
+		{
+			fn(thread_states[i].lua_state(), false);
+			UnlockThreadState(i);
+		}
+		fn(GetMainLuaState(), true);
+	}
+
 	LUAAPI bool DoLuaFile(sol::string_view file) const;
 	LUAAPI static sol::optional<sol::function> LoadLuaBuffer(sol::string_view package, sol::string_view group, sol::string_view instance);
 	LUAAPI static bool LuaFileExists(sol::string_view package, sol::string_view group, sol::string_view instance);
 	LUAAPI static eastl::vector<sol::u16string_view> GetPackages();
+	LUAAPI static bool IsMainThread();
+
+	static void RegisterCPPMod(sol::string_view mod, uint32_t version)
+	{
+		RegisterAPIMod(mod, version);
+		LuaAPI::SporeDetours::Attach();
+	}
+private:
+	struct LUAAPI MutexedLuaState
+	{
+		MutexedLuaState(std::mutex* _mutex, lua_State* _state);
+		MutexedLuaState(const MutexedLuaState&) = delete;
+		MutexedLuaState& operator=(const MutexedLuaState&) = delete;
+		MutexedLuaState(MutexedLuaState&& rhs);
+		MutexedLuaState& operator=(MutexedLuaState&& rhs);
+		~MutexedLuaState();
+
+		lua_State* state;
+	private:
+		std::mutex* mutex;
+	};
+	LUAAPI [[nodiscard]] MutexedLuaState GetFreeThreadLuaState() const;
+	LUAAPI void LockAllThreadStates() const;
+	LUAAPI [[nodiscard]] sol::state* GetThreadStateArray();
+	LUAAPI void UnlockThreadState(size_t index) const;
+
+	constexpr static size_t NumThreadStates = 2;
+	LUAAPI [[nodiscard]] static size_t GetNumThreadStates() { return NumThreadStates; }
+	LUAAPI static void RegisterAPIMod(sol::string_view mod, uint32_t version);
 LUA_INTERNALPUBLIC:
 	static void Initialize();
 	static void Finalize();
@@ -42,22 +106,28 @@ LUA_INTERNALPUBLIC:
 	static bool Exists();
 
 	bool InternalDoLuaFile(sol::string_view file) const;
-	static sol::optional<sol::function> InternalLoadLuaBuffer(sol::string_view package, sol::string_view group, sol::string_view instance);
+	static sol::optional<sol::function> InternalLoadLuaBuffer(sol::state_view s, sol::string_view package, sol::string_view group, sol::string_view instance);
 	static bool InternalLuaFileExists(sol::string_view package, sol::string_view group, sol::string_view instance);
+
+	static vector<pair<sol::string_view, uint32_t>>& GetCPPMods();
 	
-	void PostInit() const;
+	void PostInit();
 public:
 	LuaSpore(const LuaSpore&) = delete;
     LuaSpore& operator=(const LuaSpore&) = delete;
 	LuaSpore(LuaSpore&&) = delete;
     LuaSpore& operator=(LuaSpore&&) = delete;
 private:
-	static LuaSpore* mInstance;
+	static inline LuaSpore* sInstance = nullptr;
+	static inline std::thread::id sMainThreadId;
+	static inline vector<pair<sol::string_view, uint32_t>> sCPPMods;
 
 	LuaSpore();
 	~LuaSpore();
-private:
-	void Update(double dt) const;
+
+	void InitializeState(sol::state& s, bool is_main_state);
+
+	void Update(double dt);
 
 	static void LoadLuaGlobals(sol::state& s);
 
@@ -67,8 +137,10 @@ private:
 	const eastl::string16& GetLuaDevAbsolute();
 
 	static constexpr const char16_t* luadev_folder = u"luadev";
-
+	
 	sol::state mState;
+	mutable eastl::vector<std::mutex*> mThreadStatesMutex;
+	eastl::vector<sol::state> mThreadStates;
 
 	sol::function mLuaTraceback;
 	sol::function mLuaUpdate;

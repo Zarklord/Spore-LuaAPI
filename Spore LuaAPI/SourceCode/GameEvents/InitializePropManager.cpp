@@ -19,43 +19,46 @@
 
 #include <pch.h>
 
-#include "Spore/App/cPropManager.h"
-
 #ifdef LUAAPI_DLL_EXPORT
+
+#include <Spore/App/cPropManager.h>
 
 #include <LuaSpore/SporeDetours.h>
 #include <LuaSpore/LuaSporeCallbacks.h>
+
+static sol::function sOnPropManagerInitialized;
+
+OnLuaPostInit(sol::state_view s, bool is_main_state)
+{
+	if (!is_main_state) return;
+	sOnPropManagerInitialized = s["OnPropManagerInitialized"];
+}
+
+OnLuaDispose(sol::state_view s, bool is_main_state)
+{
+	if (!is_main_state) return;
+	sOnPropManagerInitialized.reset();
+}
 
 virtual_detour(Initialize_detour, App::cPropManager, App::IPropManager, bool())
 {
 	bool detoured()
 	{
 		const bool real_initialize = !mbIsInitialized;
-
 		const bool result = original_function(this);
 
 		if (real_initialize)
 		{
-			LUA_THREAD_SAFETY();
-			sol::state_view s = GetLuaSpore().GetState();
-			s["PropManager"] = static_cast<App::IPropManager*>(this);
-			(void)sOnPropManagerInitialized();
+			GetLuaSpore().ExecuteOnAllStates([this](sol::state_view s, bool is_main_state)
+			{
+				s["PropManager"] = static_cast<App::IPropManager*>(this);
+				if (!is_main_state) return;
+				sOnPropManagerInitialized();
+			});
 		}
 		return result;
 	}
-
-	static inline sol::unsafe_function sOnPropManagerInitialized;
 };
-
-OnLuaPostInit(sol::state_view s)
-{
-	Initialize_detour::sOnPropManagerInitialized = s["OnPropManagerInitialized"];
-}
-
-OnLuaDispose(sol::state_view s)
-{
-	Initialize_detour::sOnPropManagerInitialized.reset();
-}
 
 AddSporeDetours()
 {

@@ -67,5 +67,6 @@
     <ClInclude Include="LuaSpore\SolExtensions.h" />
     <ClInclude Include="LuaSpore\LuaSporeCallbacks.h" />
     <ClInclude Include="LuaSpore\SporeDetours.h" />
+    <ClInclude Include="LuaSpore\LuaSporeMultiReference.h" />
   </ItemGroup>
 </Project>

@@ -30,37 +30,56 @@
 #include <algorithm>
 #include <cuchar>
 
-namespace LuaAPI
-{
-	LUAAPI CriticalSection LuaThreadGuard;
-}
-
-LuaSpore* LuaSpore::mInstance = nullptr;
 void LuaSpore::Initialize()
 {
-	LUA_THREAD_SAFETY();
 	new LuaSpore();
 }
 
 void LuaSpore::Finalize()
 {
-	LUA_THREAD_SAFETY();
-	delete mInstance;
+	delete sInstance;
 }
 
 LuaSpore& LuaSpore::Get()
 {
-	return *mInstance;
+	return *sInstance;
 }
 
 bool LuaSpore::Exists()
 {
-	return mInstance != nullptr;
+	return sInstance != nullptr;
 }
 
 LuaSpore& GetLuaSpore()
 {
 	return LuaSpore::Get();	
+}
+
+LuaSpore::MutexedLuaState::MutexedLuaState(std::mutex* _mutex, lua_State* _state)
+: state(_state)
+, mutex(_mutex)
+{
+}
+
+LuaSpore::MutexedLuaState::~MutexedLuaState()
+{
+	if (mutex)
+		mutex->unlock();	
+}
+
+LuaSpore::MutexedLuaState::MutexedLuaState(MutexedLuaState&& rhs)
+: state(nullptr)
+, mutex(nullptr)
+{
+	*this = std::move(rhs);
+}
+
+LuaSpore::MutexedLuaState& LuaSpore::MutexedLuaState::operator=(MutexedLuaState&& rhs)
+{
+	using std::swap;
+	swap(state, rhs.state);
+	swap(mutex, rhs.mutex);
+	return *this;
 }
 
 int LuaPanic(lua_State* L)
@@ -74,23 +93,22 @@ void* LuaStateAlloc(void* ud, void* ptr, size_t osize, size_t nsize)
 {
 	if (nsize == 0)
 	{
-		delete[] static_cast<char*>(ptr);
+		free(ptr);
 		return nullptr;
 	}
-
-	const auto result = new char[nsize];
+	void* result = malloc(nsize);
 	if (ptr)
 	{
 		memcpy(result, ptr, std::min(nsize, osize));
-		delete[] static_cast<char*>(ptr);
+		free(ptr);
 	}
 	return result;
 }
 
-EXTERN_C IMAGE_DOS_HEADER __ImageBase;
+EXTERN_C IMAGE_DOS_HEADER __ImageBase; // NOLINT
 static eastl::string16 GetModAPIRoot()
 {
-	TCHAR DllPath[MAX_PATH] = {0};
+	TCHAR DllPath[MAX_PATH] = {};
 	GetModuleFileName(reinterpret_cast<HINSTANCE>(&__ImageBase), DllPath, _countof(DllPath));
 
 	eastl::string16 lua_dev_folder;
@@ -104,7 +122,7 @@ static eastl::string16 GetModAPIRoot()
 	return lua_dev_folder;
 }
 
-sol::object LuaSearcher(sol::this_state L, const sol::string_view& modulename)
+sol::object LuaSearcher(sol::this_state L, const sol::string_view modulename)
 {
 	sol::state_view s(L);
 	const auto package_end = modulename.find_first_of(".\\/");
@@ -127,7 +145,7 @@ sol::object LuaSearcher(sol::this_state L, const sol::string_view& modulename)
 	const sol::string_view group = modulename.substr(package_end+1, group_end - (package_end+1));
 	const sol::string_view instance = modulename.substr(group_end+1);
 
-	sol::optional<sol::function> fn = LuaSpore::InternalLoadLuaBuffer(package, group, instance);
+	sol::optional<sol::function> fn = LuaSpore::InternalLoadLuaBuffer(s, package, group, instance);
 	if (!fn)
 	{
 		eastl::string errmsg;
@@ -137,7 +155,7 @@ sol::object LuaSearcher(sol::this_state L, const sol::string_view& modulename)
 	return sol::make_object(s, fn);
 }
 
-static bool SporeLuaExists(sol::this_state L, const sol::string_view& modulename)
+static bool SporeLuaExists(sol::this_state L, const sol::string_view modulename)
 {
 	sol::state_view s(L);
 	const auto package_end = modulename.find_first_of(".\\/");
@@ -153,7 +171,7 @@ static bool SporeLuaExists(sol::this_state L, const sol::string_view& modulename
 	return LuaSpore::InternalLuaFileExists(package, group, instance);
 }
 
-static sol::optional<sol::function> SporeLoadLua(sol::this_state L, const sol::string_view& modulename)
+static sol::optional<sol::function> SporeLoadLua(sol::this_state L, const sol::string_view modulename)
 {
 	sol::state_view s(L);
 	const auto package_end = modulename.find_first_of(".\\/");
@@ -166,24 +184,159 @@ static sol::optional<sol::function> SporeLoadLua(sol::this_state L, const sol::s
 	const sol::string_view group = modulename.substr(package_end+1, group_end - (package_end+1));
 	const sol::string_view instance = modulename.substr(group_end+1);
 
-	return LuaSpore::InternalLoadLuaBuffer(package, group, instance);
+	return LuaSpore::InternalLoadLuaBuffer(s, package, group, instance);
 }
 
-static sol::as_table_t<eastl::vector<sol::u16string_view>> SporeGetPackages()
+static auto SporeGetPackages()
 {
 	return sol::as_table(LuaSpore::GetPackages());
+}
+
+static auto SporeGetCPPMods()
+{
+	return sol::as_table(LuaSpore::GetCPPMods());
+}
+
+static void SporeRequireOnAllThreads(sol::this_state L, const sol::string_view module)
+{
+	GetLuaSpore().ExecuteOnAllStates([module](sol::state_view s, bool is_main_state)
+	{
+		s["require"](module);
+	});
+}
+
+static void lua_deepcopyx(lua_State* source, lua_State* dest, int arg)
+{
+	switch (static_cast<sol::type>(lua_type(source, arg)))
+	{
+	case sol::type::string:
+	{
+		size_t cstring_length;
+		const char* cstring = luaL_checklstring(source, arg, &cstring_length);
+		lua_pushlstring(dest, cstring, cstring_length);
+		break;
+	}
+	case sol::type::number:
+	{
+		if (lua_isinteger(source, arg))
+		{
+			lua_pushinteger(dest, luaL_checkinteger(source, arg));
+		}
+		else
+		{
+			lua_pushnumber(dest, luaL_checknumber(source, arg));
+		}
+		break;
+	}
+	case sol::type::boolean:
+	{
+		lua_pushboolean(dest, lua_toboolean(source, arg));
+		break;
+	}
+	case sol::type::table:
+	{
+		const int abs_arg = lua_absindex(source, arg);
+		lua_newtable(dest);
+		const int table_idx = lua_absindex(dest, -1);
+
+		lua_pushnil(source);
+		while (lua_next(source, abs_arg) != 0)
+		{
+			const int key_idx = lua_absindex(source, -2);
+			const int value_idx = lua_absindex(source, -1);
+
+			lua_deepcopyx(source, dest, key_idx); //copy the key
+			const int dest_key_idx = lua_absindex(dest, -1);
+			if (static_cast<sol::type>(lua_type(dest, dest_key_idx)) == sol::type::nil)
+			{
+				lua_pop(dest, 1);
+				lua_pop(source, 1);
+				continue;
+			}
+			lua_deepcopyx(source, dest, value_idx); //copy the value
+			lua_rawset(dest, table_idx); //set the dest table
+			
+			lua_pop(source, 1);
+		}
+		break;
+	}
+	case sol::type::thread:
+	case sol::type::function:
+	case sol::type::userdata:
+	case sol::type::lightuserdata:
+	case sol::type::poly:
+	case sol::type::none:
+	case sol::type::nil:
+		lua_pushnil(dest);
+		break;
+	}
+}
+
+static void lua_deepcopy_args(lua_State* source, lua_State* dest, int offset, int num_values)
+{
+	for (int i = 1; i <= num_values; ++i)
+	{
+		lua_deepcopyx(source, dest, i + offset);
+	}
+}
+
+static void SporeExecuteOnAllThreads(sol::this_state main_state, const sol::function& fn, sol::variadic_args va)
+{
+	sol::bytecode fn_bytecode = fn.dump();
+	GetLuaSpore().ExecuteOnAllStates([main_state, fn_bytecode, &va](sol::state_view s, bool is_main_state)
+	{
+		auto x = static_cast<sol::load_status>(luaL_loadbufferx(s, reinterpret_cast<const char*>(fn_bytecode.data()), fn_bytecode.size(), "", sol::to_string(sol::load_mode::any).c_str()));
+
+		if (x != sol::load_status::ok)
+		{
+			lua_pop(s, 1);
+			return;
+		}
+		lua_deepcopy_args(main_state, s, 1, static_cast<int>(va.size()));
+		lua_call(s, va.size(), 0);
+	});
 }
 
 LuaSpore::LuaSpore()
 : mState(LuaPanic, LuaStateAlloc, this)
 {
-	mInstance = this;
+	sMainThreadId = std::this_thread::get_id();
+	sInstance = this;
 	mAbsoluteLuaDevDir = GetModAPIRoot();
 	mAbsoluteLuaDevDir.append_sprintf(u"\\%ls", luadev_folder);
+		
+	mState.change_gc_mode_incremental(100, 100, 10);
+	mState.stop_gc();
+
+	mThreadStatesMutex.reserve(NumThreadStates);
+	mThreadStates.reserve(NumThreadStates);
+	for (size_t i = 0; i < NumThreadStates; ++i)
+	{
+		mThreadStatesMutex.push_back(new std::mutex);
+		mThreadStates.emplace_back(LuaPanic, LuaStateAlloc, this);
+	}
 
 	LocateLuaMods();
-	
-	mState.open_libraries(
+
+	for (size_t i = 0; i < NumThreadStates; ++i)
+	{
+		std::lock_guard lock(*mThreadStatesMutex[i]);
+		InitializeState(mThreadStates[i], false);
+	}
+
+	InitializeState(mState, true);
+
+	for (size_t i = 0; i < NumThreadStates; ++i)
+	{
+		std::lock_guard lock(*mThreadStatesMutex[i]);
+		LuaAPI::LuaPostInitializers::RunCallbacks(mThreadStates[i], false);
+	}
+	LuaAPI::LuaPostInitializers::RunCallbacks(mState, true);
+}
+
+void LuaSpore::InitializeState(sol::state& s, bool is_main_state)
+{
+	s.open_libraries(
 		sol::lib::base,
 		sol::lib::package,
 		sol::lib::coroutine,
@@ -195,12 +348,21 @@ LuaSpore::LuaSpore()
 		sol::lib::io,
 		sol::lib::utf8
 	);
-	
-	mState["SporeLuaExists"] = SporeLuaExists;
-	mState["SporeLoadLua"] = SporeLoadLua;
-	mState["GetSporeDBPFNames"] = SporeGetPackages;
 
-	auto package_searchers = mState["package"]["searchers"];
+	s["MAIN_STATE"] = is_main_state;
+	
+	s["SporeLuaExists"] = SporeLuaExists;
+	s["SporeLoadLua"] = SporeLoadLua;
+	s["GetSporeDBPFNames"] = SporeGetPackages;
+	s["GetCPPMods"] = SporeGetCPPMods;
+
+	if (is_main_state)
+	{
+		s["RequireOnAllThreads"] = SporeRequireOnAllThreads;
+		s["ExecuteOnAllThreads"] = SporeExecuteOnAllThreads;
+	}
+
+	auto package_searchers = s["package"]["searchers"];
 	if (package_searchers.valid())
 	{
 		package_searchers[2] = LuaSearcher;
@@ -208,27 +370,38 @@ LuaSpore::LuaSpore()
 		package_searchers[4] = sol::nil;
 	}
 
-	LoadLuaGlobals(mState);
+	LoadLuaGlobals(s);
 
-	LuaAPI::LuaInitializers::RunCallbacks(mState);
+	LuaAPI::LuaInitializers::RunCallbacks(s, is_main_state);
 
-	if (!InternalDoLuaFile("luaspore/scripts/main"))
+	if (is_main_state)
 	{
-		return;
-	}
+		if (!InternalDoLuaFile("luaspore/scripts/main"))
+		{
+			return;
+		}
 
-	LuaAPI::LuaPostInitializers::RunCallbacks(mState);
-	
-	mLuaUpdate = mState["Update"];
+		mLuaUpdate = s["Update"];
+	}
 }
 
 LuaSpore::~LuaSpore()
 {
-	LuaAPI::LuaDisposers::RunCallbacks(mState);
-	mInstance = nullptr;
+	for (size_t i = 0; i < NumThreadStates; ++i)
+	{
+		std::lock_guard lock(*mThreadStatesMutex[i]);
+		LuaAPI::LuaDisposers::RunCallbacks(mThreadStates[i], false);
+	}
+	LuaAPI::LuaDisposers::RunCallbacks(mState, true);
+	
+	for (size_t i = 0; i < NumThreadStates; ++i)
+	{
+		delete mThreadStatesMutex[i];
+	}
+	sInstance = nullptr;
 }
 
-void LuaSpore::PostInit() const
+void LuaSpore::PostInit()
 {
 	//this has a lifetime of the whole game, so we don't need to store the result to remove the update function
 	Clock clock(Clock::Mode::Milliseconds);
@@ -241,28 +414,75 @@ void LuaSpore::PostInit() const
 	});
 }
 
-void LuaSpore::Update(double dt) const
+void LuaSpore::Update(double dt)
 {
-	if (!mLuaUpdate.valid()) return;
-	LUA_THREAD_SAFETY();
+	if (!mLuaUpdate) return;
+	mLuaUpdate.call(dt);
 	const auto result = mLuaUpdate(dt);
+
+	mState.step_gc(0);
 }
 
-lua_State* LuaSpore::GetLuaState() const
+bool LuaSpore::CanExecuteOnMainState()
 {
-	return mState.lua_state();
+	return IsMainThread();	
+}
+
+lua_State* LuaSpore::GetMainLuaState() const
+{
+	assert(CanExecuteOnMainState());
+	return mState;
+}
+
+LuaSpore::MutexedLuaState LuaSpore::GetFreeThreadLuaState() const
+{
+	while (true)
+	{
+		for (size_t i = 0; i < NumThreadStates; ++i)
+		{
+			auto* mutex = mThreadStatesMutex[i];
+			if (mutex->try_lock())
+			{
+				return {mutex, mThreadStates[i].lua_state()};
+			}
+		}
+		std::this_thread::sleep_for(std::chrono::milliseconds(1));
+	}
+}
+
+void LuaSpore::LockAllThreadStates() const
+{
+	for (size_t i = 0; i < NumThreadStates; ++i)
+	{
+		mThreadStatesMutex[i]->lock();
+	}
+}
+
+sol::state* LuaSpore::GetThreadStateArray()
+{
+	return mThreadStates.data();
+}
+
+void LuaSpore::UnlockThreadState(size_t index) const
+{
+	assert(index < NumThreadStates);
+	mThreadStatesMutex[index]->unlock();
+}
+
+void LuaSpore::RegisterAPIMod(sol::string_view mod, uint32_t version)
+{
+	sCPPMods.push_back({mod, version});
 }
 
 bool LuaSpore::DoLuaFile(const sol::string_view file) const
 {
-	LUA_THREAD_SAFETY();
 	return InternalDoLuaFile(file);
 }
 
 bool LuaSpore::InternalDoLuaFile(sol::string_view file) const
 {
 	ModAPI::Log("DoLuaFile %.*s.lua", static_cast<int>(file.length()), file.data());
-
+	
 	const auto& result = mState["require"](file);
 	if (!result.valid())
 	{
@@ -275,11 +495,15 @@ bool LuaSpore::InternalDoLuaFile(sol::string_view file) const
 
 sol::optional<sol::function> LuaSpore::LoadLuaBuffer(sol::string_view package, sol::string_view group, sol::string_view instance)
 {
-	LUA_THREAD_SAFETY();
-	return InternalLoadLuaBuffer(package, group, instance);
+	sol::optional<sol::function> result;
+	GetLuaSpore().ExecuteOnMainState([&result, package, group, instance](lua_State* L)
+	{
+		result = InternalLoadLuaBuffer(L, package, group, instance);
+	});
+	return result;
 }
 
-sol::optional<sol::function> LuaSpore::InternalLoadLuaBuffer(sol::string_view package, sol::string_view group, sol::string_view instance)
+sol::optional<sol::function> LuaSpore::InternalLoadLuaBuffer(sol::state_view s, sol::string_view package, sol::string_view group, sol::string_view instance)
 {
 	LuaSpore& lua_spore = GetLuaSpore();
 	eastl::vector<char*> data;
@@ -333,12 +557,11 @@ sol::optional<sol::function> LuaSpore::InternalLoadLuaBuffer(sol::string_view pa
 		static_cast<int>(instance.length()), instance.data()
 	);
 
-	return lua_spore.mState.load_buffer(reinterpret_cast<const char*>(data.data()), data.size(), filename.c_str(), sol::load_mode::text);
+	return s.load_buffer(reinterpret_cast<const char*>(data.data()), data.size(), filename.c_str(), sol::load_mode::text);
 }
 
 bool LuaSpore::LuaFileExists(sol::string_view package, sol::string_view group, sol::string_view instance)
 {
-	LUA_THREAD_SAFETY();
 	return InternalLuaFileExists(package, group, instance);
 }
 
@@ -373,10 +596,10 @@ bool LuaSpore::InternalLuaFileExists(sol::string_view package, sol::string_view 
 	}
 }
 
-eastl::vector<sol::u16string_view> LuaSpore::GetPackages()
+vector<sol::u16string_view> LuaSpore::GetPackages()
 {
 	LuaSpore& lua_spore = GetLuaSpore();
-	eastl::vector<sol::u16string_view> packages;
+	vector<sol::u16string_view> packages;
 
 	for (auto& package : lua_spore.mLuaFolders)
 	{
@@ -390,6 +613,16 @@ eastl::vector<sol::u16string_view> LuaSpore::GetPackages()
 	}
 
 	return packages;
+}
+
+vector<pair<sol::string_view, uint32_t>>& LuaSpore::GetCPPMods()
+{
+	return sCPPMods;
+}
+
+bool LuaSpore::IsMainThread()
+{
+	return sMainThreadId == std::this_thread::get_id();
 }
 
 static eastl::string16 GetPackageNameFromDatabase(const Resource::Database* database)
@@ -407,7 +640,7 @@ static eastl::string16 GetPackageNameFromDatabase(const Resource::Database* data
 void LuaSpore::LocateLuaMods()
 {
 	Resource::IResourceManager::DatabaseList databases;
-	auto count = ResourceManager.GetDatabaseList(databases);
+	ResourceManager.GetDatabaseList(databases);
 
 	for (const auto database : databases)
 	{
