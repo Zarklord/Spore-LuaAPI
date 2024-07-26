@@ -665,13 +665,15 @@ static eastl::string16 GetPackageNameFromDatabase(const Resource::Database* data
 
 void LuaSpore::LocateLuaMods()
 {
-	Resource::IResourceManager::DatabaseList databases;
-	ResourceManager.GetDatabaseList(databases);
+	ResourceKey base_package{id("main"), id("lua"), id("scripts")};
+	ResourceKey mods{id("main"), id("lua"), id("mod")};
 
+	Resource::IResourceManager::DatabaseList databases;
+	ResourceManager.GetDatabaseList(databases, &base_package);
+	ResourceManager.GetDatabaseList(databases, &mods);
 	for (const auto database : databases)
 	{
 		auto package_name = GetPackageNameFromDatabase(database);
-
 		if (!package_name.empty())
 		{
 			mLuaDatabases[package_name] = database;

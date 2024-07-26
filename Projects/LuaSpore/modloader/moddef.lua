@@ -34,6 +34,9 @@ function ModDefinition:LoadModInfo()
 			printf.ModLoader("Package %s could not be loaded because the SporeLuaAPI version %d is too low, expected: %d", self.dbpf_name, cur_version, self.modinfo.base_api_version)
 			self.invalid_modinfo = true
 		end
+	else
+		printf.ModLoader("Package %s could not be loaded because the minimum SporeLuaAPI version was missing", self.dbpf_name)
+		self.invalid_modinfo = true
 	end
 
 	if self.modinfo.cpp_mod_requirements then
