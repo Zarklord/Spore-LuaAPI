@@ -25,7 +25,7 @@
 
 #include "SporeDetours.h"
 
-class LuaSpore
+class LuaSpore : App::DefaultMessageListener
 {
 public:
 	LUAAPI [[nodiscard]] static bool CanExecuteOnMainState();
@@ -112,6 +112,11 @@ LUA_INTERNALPUBLIC:
 	static vector<pair<sol::string_view, uint32_t>>& GetCPPMods();
 	
 	void PostInit();
+
+	void StartUpdating();
+	void StopUpdating();
+	
+	virtual bool HandleMessage(uint32_t messageID, void* pMessage) override;
 public:
 	LuaSpore(const LuaSpore&) = delete;
     LuaSpore& operator=(const LuaSpore&) = delete;
@@ -123,7 +128,7 @@ private:
 	static inline vector<pair<sol::string_view, uint32_t>> sCPPMods;
 
 	LuaSpore();
-	~LuaSpore();
+	~LuaSpore() override;
 
 	void InitializeState(sol::state& s, bool is_main_state);
 
@@ -144,6 +149,8 @@ private:
 
 	sol::function mLuaTraceback;
 	sol::function mLuaUpdate;
+
+	Clock mUpdateClock;
 
 	eastl::string16 mAbsoluteLuaDevDir;
 

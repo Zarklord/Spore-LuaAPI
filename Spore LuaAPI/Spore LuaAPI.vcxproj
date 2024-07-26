@@ -120,7 +120,7 @@
       <PrecompiledHeader>Use</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>WIN32;_CRT_SECURE_NO_WARNINGS;_LIB;TRACY_ENABLE;TRACY_ON_DEMAND;TRACY_IMPORTS;_DEBUG;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;_CRT_SECURE_NO_WARNINGS;_LIB;TRACY_ENABLE;TRACY_ON_DEMAND;TRACY_IMPORTS;TracyLine=TracyConcat(__LINE__,U);_DEBUG;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
@@ -138,7 +138,7 @@
       <PrecompiledHeader>Use</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>WIN32;_CRT_SECURE_NO_WARNINGS;LUAAPI_DLL_EXPORT;LUA_CORE;LUA_LIB;TRACY_ENABLE;TRACY_ON_DEMAND;TRACY_EXPORTS;_DEBUG;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;_CRT_SECURE_NO_WARNINGS;LUAAPI_DLL_EXPORT;LUA_CORE;LUA_LIB;TRACY_ENABLE;TRACY_ON_DEMAND;TRACY_EXPORTS;TracyLine=TracyConcat(__LINE__,U);_DEBUG;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
@@ -160,7 +160,7 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <PreprocessorDefinitions>WIN32;_CRT_SECURE_NO_WARNINGS;_LIB;TRACY_ENABLE;TRACY_ON_DEMAND;TRACY_IMPORTS;NDEBUG;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;_CRT_SECURE_NO_WARNINGS;_LIB;TRACY_ENABLE;TRACY_ON_DEMAND;TRACY_IMPORTS;TracyLine=TracyConcat(__LINE__,U);NDEBUG;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
@@ -182,7 +182,7 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <PreprocessorDefinitions>WIN32;_CRT_SECURE_NO_WARNINGS;LUAAPI_DLL_EXPORT;LUA_CORE;LUA_LIB;TRACY_ENABLE;TRACY_ON_DEMAND;TRACY_EXPORTS;NDEBUG;_WINDOWS;_USRDLL;SPOREMODAPITEMPLATE_EXPORTS;EXECUTABLE_TYPE=SPORE_STEAM;PATCHED_SPORE=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;_CRT_SECURE_NO_WARNINGS;LUAAPI_DLL_EXPORT;LUA_CORE;LUA_LIB;TRACY_ENABLE;TRACY_ON_DEMAND;TRACY_EXPORTS;TracyLine=TracyConcat(__LINE__,U);NDEBUG;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>

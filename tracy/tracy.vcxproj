@@ -69,7 +69,7 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <OutDir>..\lib\$(Configuration)</OutDir>
+    <OutDir>..\lib\$(Configuration)\</OutDir>
     <IntDir>..\generated\$(Configuration)\$(ProjectName)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug DLL|Win32'">
@@ -77,19 +77,19 @@
     <OutDir>..\lib\$(Configuration)\</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <OutDir>..\lib\$(Configuration)</OutDir>
+    <OutDir>..\lib\$(Configuration)\</OutDir>
     <IntDir>..\generated\$(Configuration)\$(ProjectName)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release DLL|Win32'">
-    <IntDir>..\generated\$(Configuration)\$(ProjectName)</IntDir>
-    <OutDir>..\lib\$(Configuration)</OutDir>
+    <IntDir>..\generated\$(Configuration)\$(ProjectName)\</IntDir>
+    <OutDir>..\lib\$(Configuration)\</OutDir>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_LIB;TRACY_ENABLE;TRACY_ON_DEMAND;TRACY_IMPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_LIB;TRACY_ENABLE;TRACY_ON_DEMAND;TRACY_IMPORTS;TracyLine=TracyConcat(__LINE__,U);%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
       <PrecompiledHeaderFile>
       </PrecompiledHeaderFile>
@@ -104,7 +104,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_LIB;TRACY_ENABLE;TRACY_ON_DEMAND;TRACY_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_LIB;TRACY_ENABLE;TRACY_ON_DEMAND;TRACY_EXPORTS;TracyLine=TracyConcat(__LINE__,U);%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
       <PrecompiledHeaderFile>
       </PrecompiledHeaderFile>
@@ -121,7 +121,7 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <PreprocessorDefinitions>WIN32;NDEBUG;_LIB;TRACY_ENABLE;TRACY_ON_DEMAND;TRACY_IMPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_LIB;TRACY_ENABLE;TRACY_ON_DEMAND;TRACY_IMPORTS;TracyLine=TracyConcat(__LINE__,U);%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
       <PrecompiledHeaderFile>
       </PrecompiledHeaderFile>
@@ -140,7 +140,7 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <PreprocessorDefinitions>WIN32;NDEBUG;_LIB;TRACY_ENABLE;TRACY_ON_DEMAND;TRACY_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_LIB;TRACY_ENABLE;TRACY_ON_DEMAND;TRACY_EXPORTS;TracyLine=TracyConcat(__LINE__,U);%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
       <PrecompiledHeaderFile>
       </PrecompiledHeaderFile>

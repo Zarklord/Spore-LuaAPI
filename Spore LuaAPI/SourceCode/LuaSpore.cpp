@@ -26,6 +26,9 @@
 
 #include <Spore/Resource/cResourceManager.h>
 
+#include "tracy/Tracy.hpp"
+#include "tracy/TracyLua.hpp"
+
 #include <EASTL/hash_set.h>
 #include <algorithm>
 #include <cuchar>
@@ -33,11 +36,13 @@
 void LuaSpore::Initialize()
 {
 	new LuaSpore();
+	sInstance->AddRef();
 }
 
 void LuaSpore::Finalize()
 {
-	delete sInstance;
+	sInstance->StopUpdating();
+	sInstance->Release();
 }
 
 LuaSpore& LuaSpore::Get()
@@ -93,14 +98,14 @@ void* LuaStateAlloc(void* ud, void* ptr, size_t osize, size_t nsize)
 {
 	if (nsize == 0)
 	{
-		free(ptr);
+		delete[] static_cast<char*>(ptr);
 		return nullptr;
 	}
-	void* result = malloc(nsize);
+	void* result = new char[nsize];
 	if (ptr)
 	{
 		memcpy(result, ptr, std::min(nsize, osize));
-		free(ptr);
+		delete[] static_cast<char*>(ptr);
 	}
 	return result;
 }
@@ -299,6 +304,7 @@ static void SporeExecuteOnAllThreads(sol::this_state main_state, const sol::func
 
 LuaSpore::LuaSpore()
 : mState(LuaPanic, LuaStateAlloc, this)
+, mUpdateClock(Clock::Mode::Milliseconds)
 {
 	sMainThreadId = std::this_thread::get_id();
 	sInstance = this;
@@ -336,6 +342,7 @@ LuaSpore::LuaSpore()
 
 void LuaSpore::InitializeState(sol::state& s, bool is_main_state)
 {
+	ZoneScoped;
 	s.open_libraries(
 		sol::lib::base,
 		sol::lib::package,
@@ -361,6 +368,8 @@ void LuaSpore::InitializeState(sol::state& s, bool is_main_state)
 		s["RequireOnAllThreads"] = SporeRequireOnAllThreads;
 		s["ExecuteOnAllThreads"] = SporeExecuteOnAllThreads;
 	}
+
+	tracy::LuaRegister(s);
 
 	auto package_searchers = s["package"]["searchers"];
 	if (package_searchers.valid())
@@ -403,23 +412,40 @@ LuaSpore::~LuaSpore()
 
 void LuaSpore::PostInit()
 {
-	//this has a lifetime of the whole game, so we don't need to store the result to remove the update function
-	Clock clock(Clock::Mode::Milliseconds);
-	App::AddUpdateFunction([this, &clock]()
-	{
-		const double dt = clock.GetElapsedTime() / 1000.0;
-		clock.Reset();
-		clock.Start();
-		Update(dt);
-	});
+	StartUpdating();
+}
+
+void LuaSpore::StartUpdating()
+{
+	MessageManager.AddListener(this, App::kMsgAppUpdate);
+	mUpdateClock.Reset();
+	mUpdateClock.Start();
+}
+
+void LuaSpore::StopUpdating()
+{
+	MessageManager.RemoveListener(this, App::kMsgAppUpdate);
+}
+
+bool LuaSpore::HandleMessage(uint32_t messageID, void* pMessage)
+{
+	const double dt = mUpdateClock.GetElapsedTime() / 1000.0;
+	mUpdateClock.Reset();
+	mUpdateClock.Start();
+	Update(dt);
+
+	return false;
 }
 
 void LuaSpore::Update(double dt)
 {
-	if (!mLuaUpdate) return;
-	mLuaUpdate.call(dt);
-	const auto result = mLuaUpdate(dt);
+	if (mLuaUpdate)
+	{
+		mLuaUpdate.call(dt);
+		const auto result = mLuaUpdate(dt);
+	}
 
+	ZoneScopedN("LuaGC");
 	mState.step_gc(0);
 }
 

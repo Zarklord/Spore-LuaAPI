@@ -7898,39 +7898,39 @@ namespace sol {
 	};
 
 	inline const std::string& to_string(call_status c) {
-		static const std::array<std::string, 10> names { { "ok",
-			"yielded",
-			"runtime",
-			"memory",
-			"handler",
-			"gc",
-			"syntax",
-			"file",
-			"CRITICAL_EXCEPTION_FAILURE",
-			"CRITICAL_INDETERMINATE_STATE_FAILURE" } };
+		static const std::array<std::string*, 10> names { { new std::string("ok"),
+			new std::string("yielded"),
+			new std::string("runtime"),
+			new std::string("memory"),
+			new std::string("handler"),
+			new std::string("gc"),
+			new std::string("syntax"),
+			new std::string("file"),
+			new std::string("CRITICAL_EXCEPTION_FAILURE"),
+			new std::string("CRITICAL_INDETERMINATE_STATE_FAILURE") } };
 		switch (c) {
 		case call_status::ok:
-			return names[0];
+			return *names[0];
 		case call_status::yielded:
-			return names[1];
+			return *names[1];
 		case call_status::runtime:
-			return names[2];
+			return *names[2];
 		case call_status::memory:
-			return names[3];
+			return *names[3];
 		case call_status::handler:
-			return names[4];
+			return *names[4];
 		case call_status::gc:
-			return names[5];
+			return *names[5];
 		case call_status::syntax:
-			return names[6];
+			return *names[6];
 		case call_status::file:
-			return names[7];
+			return *names[7];
 		}
 		if (static_cast<std::ptrdiff_t>(c) == -1) {
 			// One of the many cases where a critical exception error has occurred
-			return names[8];
+			return *names[8];
 		}
-		return names[9];
+		return *names[9];
 	}
 
 	inline bool is_indeterminate_call_failure(call_status c) {
@@ -7949,35 +7949,35 @@ namespace sol {
 	}
 
 	inline const std::string& to_string(load_status c) {
-		static const std::array<std::string, 7> names {
-			{ "ok", "memory", "gc", "syntax", "file", "CRITICAL_EXCEPTION_FAILURE", "CRITICAL_INDETERMINATE_STATE_FAILURE" }
+		static const std::array<std::string*, 7> names {
+			{ new std::string("ok"), new std::string("memory"), new std::string("gc"), new std::string("syntax"), new std::string("file"), new std::string("CRITICAL_EXCEPTION_FAILURE"), new std::string("CRITICAL_INDETERMINATE_STATE_FAILURE") }
 		};
 		switch (c) {
 		case load_status::ok:
-			return names[0];
+			return *names[0];
 		case load_status::memory:
-			return names[1];
+			return *names[1];
 		case load_status::gc:
-			return names[2];
+			return *names[2];
 		case load_status::syntax:
-			return names[3];
+			return *names[3];
 		case load_status::file:
-			return names[4];
+			return *names[4];
 		}
 		if (static_cast<int>(c) == -1) {
 			// One of the many cases where a critical exception error has occurred
-			return names[5];
+			return *names[5];
 		}
-		return names[6];
+		return *names[6];
 	}
 
 	inline const std::string& to_string(load_mode c) {
-		static const std::array<std::string, 3> names { {
-			"bt",
-			"t",
-			"b",
+		static const std::array<std::string*, 3> names { {
+			new std::string("bt"),
+			new std::string("t"),
+			new std::string("b"),
 		} };
-		return names[static_cast<std::size_t>(c)];
+		return *names[static_cast<std::size_t>(c)];
 	}
 
 	enum class meta_function : unsigned {
@@ -8025,7 +8025,7 @@ namespace sol {
 	typedef meta_function meta_method;
 
 	inline const std::array<std::string_view, 37>& meta_function_names() {
-		static const std::array<std::string_view, 37> names = { { "new",
+		static constexpr std::array<std::string_view, 37> names = { { "new",
 			"__index",
 			"__newindex",
 			"__mode",
