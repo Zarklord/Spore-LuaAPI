@@ -23,6 +23,8 @@
 
 #include <LuaSpore/LuaSpore.h>
 
+#include "tracy/Tracy.hpp"
+
 #define LUAAPI_MODNAME "SporeLuaAPI"
 #define LUAAPI_VERSION 100000
 
@@ -37,6 +39,10 @@ void PreInitialize()
 
 void PostInitialize()
 {
+	App::AddUpdateFunction([]
+	{
+		FrameMark;
+	});
 	GetLuaSpore().PostInit();
 }
 
@@ -60,6 +66,7 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD  ul_reason_for_call, LPVOID lpReser
 	switch (ul_reason_for_call)
 	{
 	case DLL_PROCESS_ATTACH:
+		TracySetProgramName("Spore: Galactic Adventures (Modded)");
 		ModAPI::AddPostInitFunction(PostInitialize);
 		ModAPI::AddDisposeFunction(Dispose);
 

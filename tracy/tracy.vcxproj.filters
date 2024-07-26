@@ -1,0 +1,91 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="tracy">
+      <UniqueIdentifier>{32e16c61-5b10-449c-b926-cec3b0a801bf}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="tracy\tracy">
+      <UniqueIdentifier>{b1f79096-4ee0-4fcb-b3c1-52d983944592}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="tracy\common">
+      <UniqueIdentifier>{a36391c6-9dc4-4a78-9d52-4da1b45d8646}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="tracy\public\common\TracyYield.hpp">
+      <Filter>tracy\common</Filter>
+    </ClInclude>
+    <ClInclude Include="tracy\public\common\TracyVersion.hpp">
+      <Filter>tracy\common</Filter>
+    </ClInclude>
+    <ClInclude Include="tracy\public\common\TracyUwp.hpp">
+      <Filter>tracy\common</Filter>
+    </ClInclude>
+    <ClInclude Include="tracy\public\common\TracySystem.hpp">
+      <Filter>tracy\common</Filter>
+    </ClInclude>
+    <ClInclude Include="tracy\public\common\TracyStackFrames.hpp">
+      <Filter>tracy\common</Filter>
+    </ClInclude>
+    <ClInclude Include="tracy\public\common\TracySocket.hpp">
+      <Filter>tracy\common</Filter>
+    </ClInclude>
+    <ClInclude Include="tracy\public\common\TracyQueue.hpp">
+      <Filter>tracy\common</Filter>
+    </ClInclude>
+    <ClInclude Include="tracy\public\common\TracyProtocol.hpp">
+      <Filter>tracy\common</Filter>
+    </ClInclude>
+    <ClInclude Include="tracy\public\common\TracyMutex.hpp">
+      <Filter>tracy\common</Filter>
+    </ClInclude>
+    <ClInclude Include="tracy\public\common\TracyForceInline.hpp">
+      <Filter>tracy\common</Filter>
+    </ClInclude>
+    <ClInclude Include="tracy\public\common\TracyColor.hpp">
+      <Filter>tracy\common</Filter>
+    </ClInclude>
+    <ClInclude Include="tracy\public\common\TracyApi.h">
+      <Filter>tracy\common</Filter>
+    </ClInclude>
+    <ClInclude Include="tracy\public\common\TracyAlloc.hpp">
+      <Filter>tracy\common</Filter>
+    </ClInclude>
+    <ClInclude Include="tracy\public\common\TracyAlign.hpp">
+      <Filter>tracy\common</Filter>
+    </ClInclude>
+    <ClInclude Include="tracy\public\common\tracy_lz4hc.hpp">
+      <Filter>tracy\common</Filter>
+    </ClInclude>
+    <ClInclude Include="tracy\public\common\tracy_lz4.hpp">
+      <Filter>tracy\common</Filter>
+    </ClInclude>
+    <ClInclude Include="tracy\public\tracy\TracyVulkan.hpp">
+      <Filter>tracy\tracy</Filter>
+    </ClInclude>
+    <ClInclude Include="tracy\public\tracy\TracyOpenGL.hpp">
+      <Filter>tracy\tracy</Filter>
+    </ClInclude>
+    <ClInclude Include="tracy\public\tracy\TracyOpenCL.hpp">
+      <Filter>tracy\tracy</Filter>
+    </ClInclude>
+    <ClInclude Include="tracy\public\tracy\TracyLua.hpp">
+      <Filter>tracy\tracy</Filter>
+    </ClInclude>
+    <ClInclude Include="tracy\public\tracy\TracyD3D12.hpp">
+      <Filter>tracy\tracy</Filter>
+    </ClInclude>
+    <ClInclude Include="tracy\public\tracy\TracyD3D11.hpp">
+      <Filter>tracy\tracy</Filter>
+    </ClInclude>
+    <ClInclude Include="tracy\public\tracy\TracyC.h">
+      <Filter>tracy\tracy</Filter>
+    </ClInclude>
+    <ClInclude Include="tracy\public\tracy\Tracy.hpp">
+      <Filter>tracy\tracy</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\tracy\public\TracyClient.cpp" />
+  </ItemGroup>
+</Project>
