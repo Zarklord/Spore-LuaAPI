@@ -49,6 +49,19 @@ function ModDefinition:LoadModInfo()
 		end
 	end
 
+	if self.modinfo.lua_mod_requirements then
+		for modname, min_version in pairs(self.modinfo.lua_mod_requirements) do
+			local cur_version = self.LoadedLuaMods[modname]
+			if not cur_version then
+				printf.ModLoader("Package %s could not be loaded because the lua mod '%s' was missing", self.dbpf_name, modname)
+				self.invalid_modinfo = true
+			elseif min_version > cur_version then
+				printf.ModLoader("Package %s could not be loaded because the lua mod '%s' version %d is too low, expected: %d", self.dbpf_name, modname, cur_version, min_version)
+				self.invalid_modinfo = true
+			end
+		end
+	end
+
 	self.priority = self.modinfo.priority or 0
 end
 
@@ -89,7 +102,27 @@ function ModDefinition:LoadMod()
 	end
 end
 
+local function GetLuaMods()
+	local lua_mods = {}
+	for i, dbpf_name in ipairs(GetSporeDBPFNames()) do
+		local modinfo_path = dbpf_name.."/mod/info"
+		if SporeLuaExists(modinfo_path) then
+			local modinfo = {}
+			local modinfo_fn = SporeLoadLua(modinfo_path)
+			if modinfo_fn then
+				setfenv(modinfo_fn, modinfo)
+				pcall(modinfo_fn)
+				if type(modinfo.name) == "string" and type(modinfo.version) == "version" then
+					lua_mods[modinfo.name] = modinfo.version
+				end
+			end
+		end
+	end
+	return lua_mods
+end
+
 ModDefinition.LoadedCPPMods = GetCPPMods()
+ModDefinition.LoadedLuaMods = GetLuaMods()
 
 function ModDefinition.SortByPriority(a, b)
 	local apriority = a.modinfo.priority
