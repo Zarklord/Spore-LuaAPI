@@ -340,6 +340,50 @@ LuaSpore::LuaSpore()
 	LuaAPI::LuaPostInitializers::RunCallbacks(mState, true);
 }
 
+static int protected_function_error_handler(lua_State* L)
+{
+	sol::state_view s(L);
+	eastl::string message = "An unknown error occured";
+	
+	sol::optional<sol::string_view> top_message = sol::stack::unqualified_check_get<sol::string_view>(s, 1, &sol::no_panic);
+	if (top_message)
+		message.assign(top_message->data(), top_message->size());
+
+	bool first_error = s["_TRACEBACK_FIRST_ERROR"];
+	if (!first_error)
+	{
+		s["_TRACEBACK_FIRST_ERROR"] = true;
+		
+		auto traceback_handler = s["_TRACEBACK"];
+		if (traceback_handler.get_type() == sol::type::function)
+		{
+			sol::optional<sol::string_view> traceback_message = traceback_handler(sol::string_view(message.data(), message.size()));
+			if (traceback_message)
+				message.assign(traceback_message->data(), traceback_message->size());
+		}
+
+		ModAPI::Log(message.c_str());
+	}
+	else
+	{
+		bool second_error = s["_TRACEBACK_SECOND_ERROR"];
+		if (!second_error)
+		{
+			s["_TRACEBACK_SECOND_ERROR"] = true;
+			ModAPI::Log("Script error after script error was thrown: %s", message.c_str());
+		}
+	}
+
+	return sol::stack::push(s, message);
+}
+
+static void ResetLuaSporeErrors(sol::this_state L)
+{
+	sol::state_view s(L);
+	s["_TRACEBACK_FIRST_ERROR"] = false;
+	s["_TRACEBACK_SECOND_ERROR"] = false;
+};
+
 void LuaSpore::InitializeState(sol::state& s, bool is_main_state)
 {
 	ZoneScoped;
@@ -355,6 +399,13 @@ void LuaSpore::InitializeState(sol::state& s, bool is_main_state)
 		sol::lib::io,
 		sol::lib::utf8
 	);
+	
+	s.script("_TRACEBACK = debug.traceback");
+
+	s["ResetLuaSporeErrors"] = ResetLuaSporeErrors;
+	ResetLuaSporeErrors(s.lua_state());
+
+	sol::protected_function::set_default_handler(sol::object(s, sol::in_place, protected_function_error_handler));
 
 	s["MAIN_STATE"] = is_main_state;
 	

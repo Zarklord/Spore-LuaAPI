@@ -1,4 +1,4 @@
-AddOnInitializePropManagerFunction, RemoveOnInitializePropManagerFunction, OnPropManagerInitialized = GenerateCallbackExecuter()
+AddOnInitializePropManagerFunction, RemoveOnInitializePropManagerFunction, OnPropManagerInitialized = GenerateOrderedCallbackExecuter()
 
 function ExecuteCheatCommand(fn)
     local status, r = pcall(fn)

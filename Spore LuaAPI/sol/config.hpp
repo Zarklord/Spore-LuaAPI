@@ -50,7 +50,7 @@ the build system, or the command line options of your compiler.
 
 #define SOL_SAFE_NUMERICS 1
 #define SOL_NO_CHECK_NUMBER_PRECISION 1
-#define SOL_SAFE_FUNCTIONS 0
+#define SOL_SAFE_FUNCTIONS 1
 
 #ifdef _DEBUG
 #define SOL_SAFE_USERTYPE 1

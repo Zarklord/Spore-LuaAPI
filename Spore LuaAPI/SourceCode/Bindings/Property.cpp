@@ -427,11 +427,35 @@ static void PropertyLuaSet(sol::this_state L, Extensions::Property& property, si
 			value_ptr[idx].assign(new_str.data(), new_str.length());
 			break;
 		}
-		case App::PropertyType::Text:
 		case App::PropertyType::Bool:
+		{
+			const auto new_bool= value.as<bool>();
+			const auto type_size = property.GetItemSize();
+			memcpy(static_cast<char*>(void_value_ptr) + idx * type_size, &new_bool, type_size);
+			break;
+		}
 		case App::PropertyType::Int32:
+		{
+			const auto new_int32 = value.as<int32_t>();
+			const auto type_size = property.GetItemSize();
+			memcpy(static_cast<char*>(void_value_ptr) + idx * type_size, &new_int32, type_size);
+			break;
+		}
 		case App::PropertyType::UInt32:
+		{
+			const auto new_uint32 = value.as<uint32_t>();
+			const auto type_size = property.GetItemSize();
+			memcpy(static_cast<char*>(void_value_ptr) + idx * type_size, &new_uint32, type_size);
+			break;
+		}
 		case App::PropertyType::Float:
+		{
+			const auto new_float = value.as<float>();
+			const auto type_size = property.GetItemSize();
+			memcpy(static_cast<char*>(void_value_ptr) + idx * type_size, &new_float, type_size);
+			break;
+		}
+		case App::PropertyType::Text:
 		case App::PropertyType::Key:
 		case App::PropertyType::Vector2:
 		case App::PropertyType::Vector3:

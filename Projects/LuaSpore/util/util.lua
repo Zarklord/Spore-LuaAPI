@@ -155,3 +155,22 @@ function GenerateCallbackExecuter()
     end
     return AddCallback, RemoveCallback, ExecuteCallbacks
 end
+
+function GenerateOrderedCallbackExecuter()
+    local callbacks = {}
+    local function AddCallback(callback)
+        table.insert(callbacks, callback)
+    end
+    local function RemoveCallback(callback)
+        table.removearrayvalue(callbacks, callback)
+    end
+    local function ExecuteCallbacks(...)
+        for i, callback in ipairs(callbacks) do
+            local result = callback(...)
+            if result ~= nil then
+                return result
+            end
+        end
+    end
+    return AddCallback, RemoveCallback, ExecuteCallbacks
+end

@@ -26,7 +26,7 @@
 #include "tracy/Tracy.hpp"
 
 #define LUAAPI_MODNAME "SporeLuaAPI"
-#define LUAAPI_VERSION 100000
+#define LUAAPI_VERSION 10000
 
 void PreInitialize()
 {

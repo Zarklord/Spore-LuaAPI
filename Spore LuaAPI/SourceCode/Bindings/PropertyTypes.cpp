@@ -33,9 +33,10 @@ OnLuaInit(sol::state_view s, bool is_main_state)
 				new(memory) ResourceKey(instanceID, typeID, groupID);
 			}
 		),
-		"instance_id", &ResourceKey::instanceID,
-		"group_id", &ResourceKey::groupID,
-		"type_id", &ResourceKey::typeID
+		"instance_id", sol::property([](const ResourceKey& key){ return key.instanceID; }, [](ResourceKey& key, const LuaFNVHash instanceID){ key.instanceID = instanceID; }),
+		"group_id", sol::property([](const ResourceKey& key){ return key.groupID; }, [](ResourceKey& key, const LuaFNVHash groupID){ key.groupID = groupID; }),
+		"type_id", sol::property([](const ResourceKey& key){ return key.typeID; }, [](ResourceKey& key, const LuaFNVHash typeID){ key.typeID = typeID; }),
+		sol::meta_function::to_string, [](const ResourceKey& key) { return eastl::string().sprintf("ResourceKey 0x%X!0x%X.0x%X", key.groupID, key.instanceID, key.typeID); }
 	);
 
 	s.new_usertype<App::Property::TextProperty>(
@@ -43,7 +44,8 @@ OnLuaInit(sol::state_view s, bool is_main_state)
 		sol::no_constructor,
 		"table_id", sol::readonly(&App::Property::TextProperty::tableID),
 		"instance_id", sol::readonly(&App::Property::TextProperty::instanceID),
-		"buffer", sol::readonly(&App::Property::TextProperty::buffer)
+		"buffer", sol::readonly(&App::Property::TextProperty::buffer),
+		sol::meta_function::to_string, [](const App::Property::TextProperty& text) { return string().sprintf("App::Property::TextProperty (0x%X!0x%X) \"%ls\"", text.tableID, text.instanceID, text.buffer); }
 	);
 
 	s.new_usertype<LocalizedString>(
@@ -68,14 +70,16 @@ OnLuaInit(sol::state_view s, bool is_main_state)
 			{
 				str.SetText(text.tableID, text.instanceID);
 			}
-		)
+		),
+		sol::meta_function::to_string, [](const LocalizedString& localized_string) { return string().sprintf("LocalizedString \"%ls\"", localized_string.GetText()); }
 	);
 
 	s.new_usertype<Vector2>(
 		"Vector2",
 		sol::call_constructor, sol::constructors<Vector2(), Vector2(float, float)>(),
 		"x", &Vector2::x,
-		"y", &Vector2::y
+		"y", &Vector2::y,
+		sol::meta_function::to_string, [](const Vector2& vec) { return string().sprintf("Vector2 (%2.2f, %2.2f)", vec.x, vec.y); }
 	);
 
 	s.new_usertype<Vector3>(
@@ -83,7 +87,8 @@ OnLuaInit(sol::state_view s, bool is_main_state)
 		sol::call_constructor, sol::constructors<Vector3(), Vector3(float, float, float)>(),
 		"x", &Vector3::x,
 		"y", &Vector3::y,
-		"z", &Vector3::z
+		"z", &Vector3::z,
+		sol::meta_function::to_string, [](const Vector3& vec) { return string().sprintf("Vector3 (%2.2f, %2.2f, %2.2f)", vec.x, vec.y, vec.z); }
 	);
 
 	s.new_usertype<Vector4>(
@@ -92,7 +97,8 @@ OnLuaInit(sol::state_view s, bool is_main_state)
 		"x", &Vector4::x,
 		"y", &Vector4::y,
 		"z", &Vector4::z,
-		"w", &Vector4::w
+		"w", &Vector4::w,
+		sol::meta_function::to_string, [](const Vector4& vec) { return string().sprintf("Vector4 (%2.2f, %2.2f, %2.2f, %2.2f)", vec.x, vec.y, vec.z, vec.w); }
 	);
 
 	s.new_usertype<ColorRGB>(
@@ -100,7 +106,8 @@ OnLuaInit(sol::state_view s, bool is_main_state)
 		sol::call_constructor, sol::constructors<ColorRGB(), ColorRGB(float, float, float)>(),
 		"r", &ColorRGB::r,
 		"g", &ColorRGB::g,
-		"b", &ColorRGB::b
+		"b", &ColorRGB::b,
+		sol::meta_function::to_string, [](const ColorRGB& color) { return string().sprintf("ColorRGB (%2.2f, %2.2f, %2.2f)", color.r, color.g, color.b); }
 	);
 
 	s.new_usertype<ColorRGBA>(
@@ -109,7 +116,8 @@ OnLuaInit(sol::state_view s, bool is_main_state)
 		"r", &ColorRGBA::r,
 		"g", &ColorRGBA::g,
 		"b", &ColorRGBA::b,
-		"a", &ColorRGBA::a
+		"a", &ColorRGBA::a,
+		sol::meta_function::to_string, [](const ColorRGBA& color) { return string().sprintf("ColorRGBA (%2.2f, %2.2f, %2.2f, %2.2f)", color.r, color.g, color.b, color.a); }
 	);
 
 	s.new_usertype<Matrix3>(
@@ -123,7 +131,8 @@ OnLuaInit(sol::state_view s, bool is_main_state)
 		"Set", [](Matrix3& mat, int row, int column, float value)
 		{
 			mat.m[row][column] = value;
-		}
+		},
+		sol::meta_function::to_string, []{ return string().sprintf("Matrix3"); }
 	);
 
 	s.new_usertype<Transform>(
@@ -155,14 +164,16 @@ OnLuaInit(sol::state_view s, bool is_main_state)
 			{
 				transform.SetRotation(euler);
 			}
-		)
+		),
+		sol::meta_function::to_string, []{ return string().sprintf("Transform"); }
 	);
 
 	s.new_usertype<BoundingBox>(
 		"BoundingBox",
 		sol::call_constructor, sol::constructors<BoundingBox(), BoundingBox(const Vector3&, const Vector3&)>(),
 		"lower", &BoundingBox::lower,
-		"upper", &BoundingBox::upper
+		"upper", &BoundingBox::upper,
+		sol::meta_function::to_string, []{ return string().sprintf("BoundingBox"); }
 	);	
 }
 
