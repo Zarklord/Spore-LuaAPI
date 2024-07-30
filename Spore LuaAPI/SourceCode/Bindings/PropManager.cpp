@@ -55,6 +55,10 @@ OnLuaInit(sol::state_view s, bool is_main_state)
 				return sol::nil;
 			}
 			return sol::make_object(s, property_list);
+		},
+		sol::meta_function::to_string, [](const App::IPropManager& prop_manager)
+		{
+			return string().sprintf("App::IPropManager (%p)", &prop_manager);
 		}
 	);
 }

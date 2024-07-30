@@ -147,7 +147,6 @@ private:
 	mutable eastl::vector<std::mutex*> mThreadStatesMutex;
 	eastl::vector<sol::state> mThreadStates;
 
-	sol::function mLuaTraceback;
 	sol::function mLuaUpdate;
 
 	Clock mUpdateClock;

@@ -63,7 +63,11 @@ OnLuaInit(sol::state_view s, bool is_main_state)
 		},
 		"Clear",&App::PropertyList::Clear,
 		"SetParent", &App::PropertyList::SetParent,
-		"SetResourceKey", &App::PropertyList::SetResourceKey
+		"SetResourceKey", &App::PropertyList::SetResourceKey,
+		sol::meta_function::to_string, [](const App::PropertyList& prop_list)
+		{
+			return string().sprintf("App::PropertyList (%p)", &prop_list);
+		}
 	);
 }
 

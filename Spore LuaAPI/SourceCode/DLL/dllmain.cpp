@@ -40,10 +40,7 @@ void PreInitialize()
 
 void PostInitialize()
 {
-	App::AddUpdateFunction([]
-	{
-		FrameMark;
-	});
+	App::AddUpdateFunction([]{ FrameMark; });
 	GetLuaSpore().PostInit();
 }
 

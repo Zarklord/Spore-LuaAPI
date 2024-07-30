@@ -16389,8 +16389,8 @@ namespace sol {
 		using typical_file_chunk_name_t = char[SOL_FILE_ID_SIZE_I_];
 
 		inline const std::string& default_chunk_name() {
-			static const std::string name = "";
-			return name;
+			static const std::string* name = new std::string("");
+			return *name;
 		}
 
 		template <std::size_t N>

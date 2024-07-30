@@ -3,6 +3,7 @@ RequireOnAllThreads("luaspore/util/util")
 
 RequireOnAllThreads("luaspore/scripts/logging")
 RequireOnAllThreads("luaspore/scripts/debugging")
+
 require("luaspore/scripts/scheduler")
 require("luaspore/scripts/update")
 require("luaspore/scripts/gamelogic")

@@ -92,7 +92,7 @@ function dumptable(obj, recurse_levels, indent, visit_table, is_terse)
     local i_recurse_levels = recurse_levels or 5
     if obj then
         local dent = string.rep("\t", indent)
-        if type(obj)==type("") then
+        if type(obj) == "string" then
             print(obj)
             return
         end
@@ -115,12 +115,8 @@ function dumptable(obj, recurse_levels, indent, visit_table, is_terse)
         for i,k in ipairs(keys) do
             local v = obj[k]
             if type(v) == "table" and i_recurse_levels>0 then
-                if v.entity and v.entity:GetGUID() then
-                    print(dent.."K: ",k," V: ", v, "(Entity -- skipping.)")
-                else
-                    print(dent.."K: ",k," V: ", v)
-                    dumptable(v, i_recurse_levels-1, indent+1, visit_table)
-                end
+                print(dent.."K: ",k," V: ", v)
+                dumptable(v, i_recurse_levels-1, indent+1, visit_table)
             else
                 print(dent.."K: ",k," V: ",v)
             end

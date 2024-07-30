@@ -160,9 +160,8 @@ sol::object LuaSearcher(sol::this_state L, const sol::string_view modulename)
 	return sol::make_object(s, fn);
 }
 
-static bool SporeLuaExists(sol::this_state L, const sol::string_view modulename)
+static bool SporeLuaExists(const sol::string_view modulename)
 {
-	sol::state_view s(L);
 	const auto package_end = modulename.find_first_of(".\\/");
 	const auto group_end = modulename.find_last_of(".\\/");
 
@@ -285,20 +284,39 @@ static void lua_deepcopy_args(lua_State* source, lua_State* dest, int offset, in
 	}
 }
 
+static void lua_deepcopy_upvalues(lua_State* source, int source_function, lua_State* dest, int dest_function)
+{
+	for (int i = 2; i <= 256; ++i)
+	{
+		const char* source_name = lua_getupvalue(source, source_function, i);
+		if (source_name == nullptr) break;
+		
+		lua_deepcopyx(source, dest, lua_absindex(source, -1));
+		lua_pop(source, 1);
+
+		const char* dest_name = lua_setupvalue(dest, dest_function, i);
+		assert(dest_name != nullptr && strcmp(source_name, dest_name) == 0);
+	}
+}
+
 static void SporeExecuteOnAllThreads(sol::this_state main_state, const sol::function& fn, sol::variadic_args va)
 {
 	sol::bytecode fn_bytecode = fn.dump();
-	GetLuaSpore().ExecuteOnAllStates([main_state, fn_bytecode, &va](sol::state_view s, bool is_main_state)
+	GetLuaSpore().ExecuteOnAllStates([main_state, fn_bytecode, &va](const sol::state_view& s, bool is_main_state)
 	{
-		auto x = static_cast<sol::load_status>(luaL_loadbufferx(s, reinterpret_cast<const char*>(fn_bytecode.data()), fn_bytecode.size(), "", sol::to_string(sol::load_mode::any).c_str()));
+		lua_getglobal(s, sol::detail::default_handler_name());
+		const int error_handler = lua_gettop(s);
 
+		auto x = static_cast<sol::load_status>(luaL_loadbufferx(s, reinterpret_cast<const char*>(fn_bytecode.data()), fn_bytecode.size(), "", sol::to_string(sol::load_mode::any).c_str()));
 		if (x != sol::load_status::ok)
 		{
-			lua_pop(s, 1);
+			lua_pop(s, 2);
 			return;
 		}
+		lua_deepcopy_upvalues(main_state, 1, s, lua_gettop(s));
 		lua_deepcopy_args(main_state, s, 1, static_cast<int>(va.size()));
-		lua_call(s, va.size(), 0);
+		lua_pcall(s, va.size(), 0, error_handler);
+		lua_remove(s, error_handler);
 	});
 }
 

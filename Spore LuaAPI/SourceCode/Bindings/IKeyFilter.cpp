@@ -26,7 +26,11 @@ OnLuaInit(sol::state_view s, bool is_main_state)
 {
 	s.new_usertype<Resource::IKeyFilter>(
 		"IKeyFilter",
-		"IsValid", &Resource::IKeyFilter::IsValid
+		"IsValid", &Resource::IKeyFilter::IsValid,
+		sol::meta_function::to_string, [](const Resource::IKeyFilter& key_filter)
+		{
+			return string().sprintf("Resource::IKeyFilter (%p)", &key_filter);
+		}
 	);
 }
 

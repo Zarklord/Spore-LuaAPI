@@ -705,7 +705,11 @@ OnLuaInit(sol::state_view s, bool is_main_state)
 		"Reserve", PropertyLuaReserve,
 		"SetType", PropertySetType,
 		"CopyFrom", PropertyLuaCopyFrom,
-		"ReferenceFrom", PropertyLuaReferenceFrom
+		"ReferenceFrom", PropertyLuaReferenceFrom,
+		sol::meta_function::to_string, [](const Extensions::Property& property)
+		{
+			return string().sprintf("App::Property (%p)", &property);
+		}
 	);
 }
 

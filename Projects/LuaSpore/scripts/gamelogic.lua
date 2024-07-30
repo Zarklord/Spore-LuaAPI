@@ -3,6 +3,6 @@ AddOnInitializePropManagerFunction, RemoveOnInitializePropManagerFunction, OnPro
 function ExecuteCheatCommand(fn)
     local status, r = pcall(fn)
     if not status then
-        print(r)
+        return r
     end
 end

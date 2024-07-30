@@ -72,30 +72,35 @@ function ModDefinition:LoadMod()
 	if self.invalid_modinfo then return end
 	printf.ModLoader("Mod: %s (%s) Loading mod/main.lua", self.dbpf_name, self.modinfo.name)
 
-	self.mod_environment = setmetatable(
-		{
-			_G = _G,
-			modinfo = self.modinfo,
-			dbpf_name = self.dbpf_name,
-			require = function(path)
-				if path:count("/") == 1 then
-					require(self.dbpf_name.."/"..path)
-				else
-					require(path)
-				end
-			end,
-			RequireOnAllThreads = function(path)
-				if path:count("/") == 1 then
-					RequireOnAllThreads(self.dbpf_name.."/"..path)
-				else
-					RequireOnAllThreads(path)
-				end
-			end,
-		},
-		{
-			__index = _G,
-		}
-	)
+	ExecuteOnAllThreads(function(modinfo, dbpf_name)
+		local env
+		env = setmetatable(
+			{
+				_G = _G,
+				modinfo = modinfo,
+				dbpf_name = dbpf_name,
+				modimport = function(path)
+					assert(path:count("/") == 1)
+					local fullpath = dbpf_name.."/"..path
+
+					local result = SporeLoadLua(fullpath)
+					if result == nil then
+						error("Error in modimport: "..fullpath..".lua not found!")
+					end
+					setfenv(result, env)
+					return result()
+				end,
+			}, { __index = _G }
+		)
+		if MAIN_STATE then
+			env.ModImportOnAllThreads = function(path)
+				ExecuteOnAllThreads(function() ModLoader:GetModEnviroment(dbpf_name).modimport(path) end)
+			end
+		end
+		ModLoader:SetModEnviroment(dbpf_name, env)
+	end, self.modinfo, self.dbpf_name)
+
+	self.mod_environment = ModLoader:GetModEnviroment(self.dbpf_name)
 
 	local mod_fn = SporeLoadLua(self.modmain_path)
 	if mod_fn then

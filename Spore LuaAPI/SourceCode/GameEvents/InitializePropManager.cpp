@@ -26,18 +26,19 @@
 #include <LuaSpore/SporeDetours.h>
 #include <LuaSpore/LuaSporeCallbacks.h>
 
-static sol::function sOnPropManagerInitialized;
+static sol::function* sOnPropManagerInitialized = nullptr;
 
 OnLuaPostInit(sol::state_view s, bool is_main_state)
 {
 	if (!is_main_state) return;
-	sOnPropManagerInitialized = s["OnPropManagerInitialized"];
+	sOnPropManagerInitialized = new sol::function(s["OnPropManagerInitialized"]);
 }
 
 OnLuaDispose(sol::state_view s, bool is_main_state)
 {
 	if (!is_main_state) return;
-	sOnPropManagerInitialized.reset();
+	delete sOnPropManagerInitialized;
+	sOnPropManagerInitialized = nullptr;
 }
 
 virtual_detour(Initialize_detour, App::cPropManager, App::IPropManager, bool())
@@ -47,13 +48,13 @@ virtual_detour(Initialize_detour, App::cPropManager, App::IPropManager, bool())
 		const bool real_initialize = !mbIsInitialized;
 		const bool result = original_function(this);
 
-		if (real_initialize)
+		if (real_initialize && sOnPropManagerInitialized && sOnPropManagerInitialized->valid())
 		{
 			GetLuaSpore().ExecuteOnAllStates([this](sol::state_view s, bool is_main_state)
 			{
 				s["PropManager"] = static_cast<App::IPropManager*>(this);
 				if (!is_main_state) return;
-				sOnPropManagerInitialized();
+				std::ignore = sOnPropManagerInitialized->call();
 			});
 		}
 		return result;

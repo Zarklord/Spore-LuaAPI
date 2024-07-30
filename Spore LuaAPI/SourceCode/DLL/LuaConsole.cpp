@@ -24,45 +24,78 @@
 #include <LuaSpore/SporeDetours.h>
 #include <LuaSpore/LuaSporeCallbacks.h>
 
-static sol::function sExecuteCheatCommand;
+static sol::function* sExecuteCheatCommand = nullptr;
 
-OnLuaInit(sol::state_view s, bool is_main_state)
+OnLuaPostInit(sol::state_view s, bool is_main_state)
 {
 	if (!is_main_state) return;
-	sExecuteCheatCommand = s["ExecuteCheatCommand"];
+	sExecuteCheatCommand = new sol::function(s["ExecuteCheatCommand"]);
 }
 
 OnLuaDispose(sol::state_view s, bool is_main_state)
 {
 	if (!is_main_state) return;
-	sExecuteCheatCommand.reset();
+	delete sExecuteCheatCommand;
+	sExecuteCheatCommand = nullptr;
 }
 
 virtual_detour(ProcessLine, App::cCheatManager, App::ICheatManager, bool(const char*))
 {
 	bool detoured(const char* pString)
 	{
-		bool success = false;
-		
-		if (sExecuteCheatCommand)
+		if (!sExecuteCheatCommand || !sExecuteCheatCommand->valid())
+			return original_function(this, pString);
+
+		ArgScript::Line argscript_line(pString);
+		const bool valid_cheat = argscript_line.GetArgumentsCount() > 0 &&
+			CALL(Address(ModAPI::ChooseAddress(0x8441E0, 0x8439D0)), ArgScript::IParser*, Args(ArgScript::FormatParser*, const char*), Args(this->GetArgScript(), argscript_line.GetArgumentAt(0))) != nullptr;
+
+		if (valid_cheat)
+			return original_function(this, pString);
+
+		eastl::string error_message;
+		GetLuaSpore().ExecuteOnMainState([&error_message, pString](sol::state_view s)
 		{
-			GetLuaSpore().ExecuteOnMainState([&success, pString](sol::state_view s)
+			constexpr sol::string_view chunk_name = "CheatConsoleInput";
+			constexpr sol::string_view error_prefix = "[string \"CheatConsoleInput\"]:1: ";
+
+
+			const auto load_result = s.load(sol::string_view(pString), chunk_name.data(), sol::load_mode::text);
+			if (!load_result.valid())
 			{
-				auto result = s.load(sol::string_view(pString), "CheatConsoleInput", sol::load_mode::text);
-				success = result.valid();
-				if (success)
+				const sol::error err = load_result;
+				sol::string_view err_msg = err.what();
+				if (err_msg.substr(0, error_prefix.size()) == error_prefix)
 				{
-					sExecuteCheatCommand(result);
+					err_msg.remove_prefix(error_prefix.size());
 				}
-			});
-		}
+				error_message.assign(err_msg.data(), err_msg.size());
+				return;
+			}
+			
+			const auto call_result = sExecuteCheatCommand->call(load_result.get<sol::function>());
+			if (!call_result.valid())
+			{
+				const sol::error err = call_result;
+				error_message = err.what();
+				return;
+			}
 
-		if (!success)
-		{
-			success = original_function(this, pString);
-		}
+			if (sol::optional<sol::string_view> err_msg = call_result)
+			{
+				if (err_msg->substr(0, error_prefix.size()) == error_prefix)
+				{
+					err_msg->remove_prefix(error_prefix.size());
+				}
+				error_message.assign(err_msg->data(), err_msg->size());
+			}
+		});
 
-		return success;
+		if (error_message.empty())
+			return true;
+
+		App::ConsolePrintF("Unknown command\n      in command '%s' or lua error: '%s'", pString, error_message.c_str());
+		return false;
 	}
 };
 

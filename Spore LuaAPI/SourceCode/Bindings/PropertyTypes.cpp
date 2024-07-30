@@ -39,13 +39,22 @@ OnLuaInit(sol::state_view s, bool is_main_state)
 		sol::meta_function::to_string, [](const ResourceKey& key) { return eastl::string().sprintf("ResourceKey 0x%X!0x%X.0x%X", key.groupID, key.instanceID, key.typeID); }
 	);
 
+
 	s.new_usertype<App::Property::TextProperty>(
 		"TextProperty",
 		sol::no_constructor,
 		"table_id", sol::readonly(&App::Property::TextProperty::tableID),
 		"instance_id", sol::readonly(&App::Property::TextProperty::instanceID),
 		"buffer", sol::readonly(&App::Property::TextProperty::buffer),
-		sol::meta_function::to_string, [](const App::Property::TextProperty& text) { return string().sprintf("App::Property::TextProperty (0x%X!0x%X) \"%ls\"", text.tableID, text.instanceID, text.buffer); }
+		sol::meta_function::to_string, [](const App::Property::TextProperty& text)
+		{
+			return string().sprintf("App::Property::TextProperty (0x%X!0x%X) \"%ls\"", text.tableID, text.instanceID, text.buffer);
+		},
+		sol::meta_function::equal_to, [](const App::Property::TextProperty& a, const App::Property::TextProperty& b)
+		{
+			return a.tableID == b.tableID && a.instanceID == b.instanceID &&
+				sol::u16string_view(a.buffer) == sol::u16string_view(b.buffer);
+		}
 	);
 
 	s.new_usertype<LocalizedString>(
@@ -71,7 +80,14 @@ OnLuaInit(sol::state_view s, bool is_main_state)
 				str.SetText(text.tableID, text.instanceID);
 			}
 		),
-		sol::meta_function::to_string, [](const LocalizedString& localized_string) { return string().sprintf("LocalizedString \"%ls\"", localized_string.GetText()); }
+		sol::meta_function::to_string, [](const LocalizedString& localized_string)
+		{
+			return string().sprintf("LocalizedString \"%ls\"", localized_string.GetText());
+		},
+		sol::meta_function::equal_to, [](const LocalizedString& a, const LocalizedString& b)
+		{
+			return a.GetText() == b.GetText();
+		}
 	);
 
 	s.new_usertype<Vector2>(
@@ -132,7 +148,17 @@ OnLuaInit(sol::state_view s, bool is_main_state)
 		{
 			mat.m[row][column] = value;
 		},
-		sol::meta_function::to_string, []{ return string().sprintf("Matrix3"); }
+		sol::meta_function::to_string, [](const Matrix3& mat)
+		{
+			return string().sprintf("Matrix3 (%2.2f, %2.2f, %2.2f, %2.2f, %2.2f, %2.2f, %2.2f, %2.2f, %2.2f)",
+				mat.m[1][1], mat.m[1][2], mat.m[1][3],
+				mat.m[2][1], mat.m[2][2], mat.m[2][3],
+				mat.m[3][1], mat.m[3][2], mat.m[3][3]);
+		},
+		sol::meta_function::equal_to, [](const Matrix3& a, const Matrix3& b)
+		{
+			return memcmp(a.m, b.m, sizeof(a.m)) == 0;
+		}
 	);
 
 	s.new_usertype<Transform>(
@@ -165,7 +191,23 @@ OnLuaInit(sol::state_view s, bool is_main_state)
 				transform.SetRotation(euler);
 			}
 		),
-		sol::meta_function::to_string, []{ return string().sprintf("Transform"); }
+		sol::meta_function::to_string, [](const Transform& transform)
+		{
+			const auto vec = transform.GetOffset();
+			const auto scale = transform.GetScale();
+			const auto rotation = transform.GetRotation();
+			return string().sprintf("Transform Offset(%2.2f, %2.2f, %2.2f) Scale(%2.2f) Rotation(%2.2f, %2.2f, %2.2f, %2.2f, %2.2f, %2.2f, %2.2f, %2.2f, %2.2f)",
+				vec.x, vec.y, vec.z,
+				scale,
+				rotation.m[1][1], rotation.m[1][2], rotation.m[1][3],
+				rotation.m[2][1], rotation.m[2][2], rotation.m[2][3],
+				rotation.m[3][1], rotation.m[3][2], rotation.m[3][3]);
+		},
+		sol::meta_function::equal_to, [](const Transform& a, const Transform& b)
+		{
+			return a.GetOffset() == b.GetOffset() && a.GetScale() == b.GetScale() &&
+				memcmp(a.GetRotation().m, b.GetRotation().m, sizeof(a.GetRotation().m)) == 0;
+		}
 	);
 
 	s.new_usertype<BoundingBox>(
@@ -173,7 +215,16 @@ OnLuaInit(sol::state_view s, bool is_main_state)
 		sol::call_constructor, sol::constructors<BoundingBox(), BoundingBox(const Vector3&, const Vector3&)>(),
 		"lower", &BoundingBox::lower,
 		"upper", &BoundingBox::upper,
-		sol::meta_function::to_string, []{ return string().sprintf("BoundingBox"); }
+		sol::meta_function::to_string, [](const BoundingBox& bbox)
+		{
+			return string().sprintf("BoundingBox (%2.2f, %2.2f, %2.2f, %2.2f, %2.2f, %2.2f)",
+				bbox.upper.x, bbox.upper.y, bbox.upper.z,
+				bbox.lower.x, bbox.lower.y, bbox.lower.z);
+		},
+		sol::meta_function::equal_to, [](const BoundingBox& a, const BoundingBox& b)
+		{
+			return a.lower == b.lower && a.upper == b.upper;
+		}
 	);	
 }
 

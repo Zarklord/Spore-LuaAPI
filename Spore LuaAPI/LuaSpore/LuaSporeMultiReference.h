@@ -53,17 +53,17 @@ public:
 		references->push_back(pair{L, std::move(value)});
 	}
 
-	sol::optional<T> get(lua_State* L)
+	T* get(lua_State* L)
 	{
-		if (!references) return {};
-		for (auto [lua_state, value] : *references)
+		if (!references) return nullptr;
+		for (auto& [lua_state, value] : *references)
 		{
 			if (lua_state == L)
 			{
-				return value;
+				return &value;
 			}
 		}
-		return {};
+		return nullptr;
 	}
 
 	void reset()
