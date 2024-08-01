@@ -1,0 +1,4 @@
+<mod displayName="Spore-LuaAPI" unique="luaapi" description="Enables loading lua mods to modify the game." isExperimental="$SPOREMOD_EXPERIMENTAL" installerSystemVersion="1.0.1.2" dllsBuild="$SPOREMOD_DLLS_BUILD">
+	<prerequisite>1.SporeLuaAPI.dll</prerequisite>
+	<prerequisite game="Spore">LuaSpore.package</prerequisite>
+</mod>
