@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE terms SYSTEM "https://resources.jetbrains.com/writerside/1.0/glossary.dtd">
+<terms>
+    <term name="spore_log">spore_log.txt is a feature added from the mod api that allows logging to a file, it's usually located in your SporebinEP1 folder</term>
+    <term name="CPP">C++ the language used to code spore and ModAPI mods</term>
+</terms>

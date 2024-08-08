@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE instance-profile
+        SYSTEM "https://resources.jetbrains.com/writerside/1.0/product-profile.dtd">
+
+<instance-profile id="luaapi" name="Spore LuaAPI" start-page="Documentation.md">
+    <toc-element topic="Documentation.md" hidden="true"/>
+    <toc-element topic="Creating-a-new-mod.md">
+        <toc-element topic="Additional-mod-info-lua-options.md"/>
+    </toc-element>
+</instance-profile>
