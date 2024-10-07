@@ -4,6 +4,8 @@ on:
   push:
     branches-ignore:
       - 'gh-pages'
+    tags:
+      - '*'
   pull_request:
   workflow_dispatch:
 
@@ -63,14 +65,7 @@ jobs:
         uses: microsoft/setup-msbuild@v2
 
       # Build Spore-ModAPI
-      - name: Cache Spore-ModAPI
-        id: cache-spore-modapi
-        uses: actions/cache/restore@v4
-        with:
-          path: Spore-ModAPI
-          key: spore-modapi-${{ env.SPORE_MOD_API_REF }}
       - name: Checkout Spore-ModAPI
-        if: ${{ steps.cache-spore-modapi.outputs.cache-hit != 'true' }}
         uses: actions/checkout@v4
         with:
           repository: 'emd4600/Spore-ModAPI'
@@ -82,12 +77,6 @@ jobs:
           cd Spore-ModAPI
           msbuild "Spore ModAPI" /m "/p:Configuration=Release DLL,Platform=x86,SDK_BUILD_VER=${{ env.SPORE_MOD_API_BUILD_VER }},EXECUTABLE_TYPE=2" `
             "/p:OutDir=${{ github.workspace }}\coreLibs\" /clp:Summary /v:m
-      - name: Save Spore-ModAPI
-        if: ${{ ! contains(github.ref_type, 'tag') && steps.cache-spore-modapi.outputs.cache-hit != 'true' }}
-        uses: actions/cache/save@v4
-        with:
-          path: Spore-ModAPI
-          key: ${{ steps.cache-spore-modapi.outputs.cache-primary-key }}
 
       # Build Spore-LuaAPI
       - name: Checkout Spore-LuaAPI
@@ -113,6 +102,7 @@ jobs:
           path: |
             coreLibs/1.SporeLuaAPI.dll
             coreLibs/1.SporeLuaAPI.pdb
+            coreLibs/1.SporeLuaAPI.lib
 
   build-sporemod:
     name: Build Sporemod

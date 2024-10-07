@@ -21,8 +21,7 @@ function ModDefinition:LoadModInfo()
 
 	if not self.modinfo.name or
 	not self.modinfo.description or
-	not self.modinfo.version or
-	not self.modinfo.name or
+	type(self.modinfo.version) ~= "number" or
 	not self.modinfo.author then
 		printf.ModLoader("Package %s has an invalid mod/info.lua", self.dbpf_name)
 		self.invalid_modinfo = true
@@ -120,7 +119,7 @@ local function GetLuaMods()
 			if modinfo_fn then
 				setfenv(modinfo_fn, modinfo)
 				pcall(modinfo_fn)
-				if type(modinfo.name) == "string" and type(modinfo.version) == "version" then
+				if type(modinfo.name) == "string" and type(modinfo.version) == "number" then
 					lua_mods[modinfo.name] = modinfo.version
 				end
 			end
