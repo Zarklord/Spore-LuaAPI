@@ -26,7 +26,7 @@
 
 #include <LuaSpore/Extensions/Property.h>
 
-static eastl::hash_map<std::uintptr_t, size_t>* sPropertyAllocationSize;
+static eastl::hash_map<std::uintptr_t, size_t>* sPropertyAllocationSize = nullptr;
 static PropertyListPtr sConstructedProperties = nullptr;
 static uint32_t sConstructedPropertiesID = 0;
 

@@ -209,7 +209,7 @@ static void SporeRequireOnAllThreads(sol::this_state L, const sol::string_view m
 	});
 }
 
-static void lua_deepcopyx(lua_State* source, lua_State* dest, int arg)
+void lua_deepcopyx(lua_State* source, lua_State* dest, int arg)
 {
 	switch (static_cast<sol::type>(lua_type(source, arg)))
 	{
@@ -276,7 +276,7 @@ static void lua_deepcopyx(lua_State* source, lua_State* dest, int arg)
 	}
 }
 
-static void lua_deepcopy_args(lua_State* source, lua_State* dest, int offset, int num_values)
+void lua_deepcopy_args(lua_State* source, lua_State* dest, int offset, int num_values)
 {
 	for (int i = 1; i <= num_values; ++i)
 	{
@@ -284,7 +284,7 @@ static void lua_deepcopy_args(lua_State* source, lua_State* dest, int offset, in
 	}
 }
 
-static void lua_deepcopy_upvalues(lua_State* source, int source_function, lua_State* dest, int dest_function)
+void lua_deepcopy_upvalues(lua_State* source, int source_function, lua_State* dest, int dest_function)
 {
 	for (int i = 2; i <= 256; ++i)
 	{
@@ -562,6 +562,46 @@ void LuaSpore::UnlockThreadState(size_t index) const
 {
 	assert(index < NumThreadStates);
 	mThreadStatesMutex[index]->unlock();
+}
+
+void LuaSpore::LockThreadState(lua_State* L) const
+{
+	if (L == mState)
+	{
+		assert(IsMainThread());
+		return;
+	}
+
+	for (size_t i = 0; i < NumThreadStates; ++i)
+	{
+		if (L == mThreadStates[i])
+		{
+			mThreadStatesMutex[i]->lock();
+			return;
+		}
+	}
+
+	assert(false);
+}
+
+void LuaSpore::UnlockThreadState(lua_State* L) const
+{
+	if (L == mState)
+	{
+		assert(IsMainThread());
+		return;
+	}
+
+	for (size_t i = 0; i < NumThreadStates; ++i)
+	{
+		if (L == mThreadStates[i])
+		{
+			mThreadStatesMutex[i]->unlock();
+			return;
+		}
+	}
+
+	assert(false);
 }
 
 void LuaSpore::RegisterAPIMod(sol::string_view mod, uint32_t version)
