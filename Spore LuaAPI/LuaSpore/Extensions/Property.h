@@ -1,5 +1,5 @@
 /****************************************************************************
-* Copyright (C) 2023-2024 Zarklord
+* Copyright (C) 2023-2025 Zarklord
 *
 * This file is part of Spore LuaAPI.
 *
