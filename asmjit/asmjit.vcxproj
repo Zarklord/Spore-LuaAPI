@@ -286,6 +286,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug DLL|Win32'">
     <OutDir>..\lib\$(Configuration)\</OutDir>
     <IntDir>..\generated\$(Configuration)\$(ProjectName)\</IntDir>
+    <IncludePath>$(ProjectDir)\src;$(VC_IncludePath);$(WindowsSDK_IncludePath);</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <OutDir>..\lib\$(Configuration)\</OutDir>
@@ -294,6 +295,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release DLL|Win32'">
     <OutDir>..\lib\$(Configuration)\</OutDir>
     <IntDir>..\generated\$(Configuration)\$(ProjectName)\</IntDir>
+    <IncludePath>$(ProjectDir)\src;$(VC_IncludePath);$(WindowsSDK_IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <OutDir>..\lib\$(Configuration)\</OutDir>
@@ -302,6 +304,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug DLL|x64'">
     <OutDir>..\lib\$(Configuration)\</OutDir>
     <IntDir>..\generated\$(Configuration)\$(ProjectName)\</IntDir>
+    <IncludePath>$(ProjectDir)\src;$(VC_IncludePath);$(WindowsSDK_IncludePath);</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <OutDir>..\lib\$(Configuration)\</OutDir>
@@ -310,6 +313,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release DLL|x64'">
     <OutDir>..\lib\$(Configuration)\</OutDir>
     <IntDir>..\generated\$(Configuration)\$(ProjectName)\</IntDir>
+    <IncludePath>$(ProjectDir)\src;$(VC_IncludePath);$(WindowsSDK_IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
