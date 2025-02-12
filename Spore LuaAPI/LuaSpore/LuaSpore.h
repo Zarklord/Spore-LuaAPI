@@ -23,6 +23,7 @@
 
 #include <mutex>
 
+#include "LuaMutex.h"
 #include "LuaSporeMultiReference.h"
 #include "SporeDetours.h"
 
@@ -33,58 +34,33 @@ LUAAPI void lua_deepcopy_upvalues(lua_State* source, int source_function, lua_St
 class LuaSpore : App::DefaultMessageListener
 {
 public:
-	LUAAPI [[nodiscard]] static bool CanExecuteOnMainState();
-	LUAAPI [[nodiscard]] lua_State* GetMainLuaState() const;
-	template <typename ExecuteOnLuaStateFn>
-	void ExecuteOnMainState(const ExecuteOnLuaStateFn fn) const
-	{
-		fn(GetMainLuaState());
-	}
-	template <typename ExecuteOnLuaStateFn>
-	void ExecuteOnFreeState(const ExecuteOnLuaStateFn fn) const
-	{
-		if (IsMainThread())
-		{
-			fn(GetMainLuaState());
-			return;	
-		}
-		const auto mutexed_state = GetFreeThreadLuaState();
-		fn(mutexed_state.state);
-	}
-	template <typename ExecuteOnLuaStateFn>
-	void ExecuteOnAllStates(const ExecuteOnLuaStateFn fn)
-	{
-		assert(IsMainThread());
+	LUAAPI static bool IsMainThread();
 
-		LockAllThreadStates();
-		const auto* thread_states = GetThreadStateArray();
-		for (size_t i = 0; i < GetNumThreadStates(); ++i)
-		{
-			fn(thread_states[i].lua_state(), false);
-			UnlockThreadState(i);
-		}
-		fn(GetMainLuaState(), true);
-	}
+	LUAAPI [[nodiscard]] MutexedLuaState GetMainLuaState();
+	LUAAPI [[nodiscard]] MutexedLuaState GetFreeLuaState();
+	LUAAPI [[nodiscard]] MutexedLuaStates GetAllLuaStates();
+
+	LUAAPI [[nodiscard]] bool IsMainState(lua_State* L) const;
 
 	template <typename T>
 	void CopyFunctionToAllStates(const sol::function& fn, LuaMultiReference<T>& output)
 	{
 		output.reset();
-		lua_State* main_state = GetMainLuaState();
+		auto main_state = GetMainLuaState();
 		sol::bytecode fn_bytecode = fn.dump();
-		fn.push();
-		ExecuteOnAllStates([&output, main_state, fn_bytecode](const sol::state_view& s, bool is_main_state)
+		fn.push(main_state.lua_state());
+		const int source_function = lua_gettop(main_state.lua_state());
+		for (lua_State* L : GetAllLuaStates())
 		{
-			const int source_function = lua_gettop(main_state);
-			auto x = static_cast<sol::load_status>(luaL_loadbufferx(s, reinterpret_cast<const char*>(fn_bytecode.data()), fn_bytecode.size(), "", sol::to_string(sol::load_mode::any).c_str()));
+			auto x = static_cast<sol::load_status>(luaL_loadbufferx(L, reinterpret_cast<const char*>(fn_bytecode.data()), fn_bytecode.size(), "", sol::to_string(sol::load_mode::any).c_str()));
 			if (x != sol::load_status::ok)
 			{
-				lua_pop(s, 1);
-				return;
+				lua_pop(L, 1);
+				continue;
 			}
-			lua_deepcopy_upvalues(main_state, source_function, s, lua_gettop(s));
-			output.set(s, sol::load_result(s, sol::absolute_index(s, -1), 1, 1, x).get<sol::function>());
-		});
+			lua_deepcopy_upvalues(main_state.lua_state(), source_function, L, lua_gettop(L));
+			output.set(L, sol::load_result(L, sol::absolute_index(L, -1), 1, 1, x).get<sol::function>());
+		}
 		fn.pop();
 	}
 
@@ -92,7 +68,6 @@ public:
 	LUAAPI static sol::optional<sol::function> LoadLuaBuffer(sol::string_view package, sol::string_view group, sol::string_view instance);
 	LUAAPI static bool LuaFileExists(sol::string_view package, sol::string_view group, sol::string_view instance);
 	LUAAPI static eastl::vector<sol::u16string_view> GetPackages();
-	LUAAPI static bool IsMainThread();
 	
 	LUAAPI void LockThreadState(lua_State* L) const;
 	LUAAPI void UnlockThreadState(lua_State* L) const;
@@ -103,26 +78,7 @@ public:
 		LuaAPI::SporeDetours::Attach();
 	}
 private:
-	struct LUAAPI MutexedLuaState
-	{
-		MutexedLuaState(std::mutex* _mutex, lua_State* _state);
-		MutexedLuaState(const MutexedLuaState&) = delete;
-		MutexedLuaState& operator=(const MutexedLuaState&) = delete;
-		MutexedLuaState(MutexedLuaState&& rhs);
-		MutexedLuaState& operator=(MutexedLuaState&& rhs);
-		~MutexedLuaState();
-
-		lua_State* state;
-	private:
-		std::mutex* mutex;
-	};
-	LUAAPI [[nodiscard]] MutexedLuaState GetFreeThreadLuaState() const;
-	LUAAPI void LockAllThreadStates() const;
-	LUAAPI [[nodiscard]] sol::state* GetThreadStateArray();
-	LUAAPI void UnlockThreadState(size_t index) const;
-
-	constexpr static size_t NumThreadStates = 2;
-	LUAAPI [[nodiscard]] static size_t GetNumThreadStates() { return NumThreadStates; }
+	LUAAPI [[nodiscard]] static size_t GetNumThreadStates() { return LuaSporeConfiguration::NumThreadStates; }
 	LUAAPI static void RegisterAPIMod(sol::string_view mod, uint32_t version);
 LUA_INTERNALPUBLIC:
 	static void Initialize();
@@ -167,9 +123,10 @@ private:
 	const eastl::string16& GetLuaDevAbsolute();
 
 	static constexpr const char16_t* luadev_folder = u"luadev";
-	
+
+	mutable std::recursive_mutex mStateMutex;
 	sol::state mState;
-	mutable eastl::vector<std::mutex*> mThreadStatesMutex;
+	mutable eastl::vector<std::recursive_mutex*> mThreadStatesMutex;
 	eastl::vector<sol::state> mThreadStates;
 
 	sol::function mLuaUpdate;

@@ -18,6 +18,7 @@
 ****************************************************************************/
 
 #pragma once
+#include "LuaMutex.h"
 
 template <typename T>
 class LuaMultiReference
@@ -25,6 +26,11 @@ class LuaMultiReference
 	using reference = pair<lua_State*, T>;
 	vector<reference>* references = nullptr;
 public:
+	void clear(const MutexedLuaState& mutexed_lua_state)
+	{
+		clear(mutexed_lua_state.lua_state());
+	}
+
 	void clear(lua_State* L)
 	{
 		if (!references) return;
@@ -47,10 +53,20 @@ public:
 		}
 	}
 
+	void set(const MutexedLuaState& mutexed_lua_state, T&& value)
+	{
+		set(mutexed_lua_state.lua_state(), std::move(value));
+	}
+
 	void set(lua_State* L, T&& value)
 	{
 		if (!references) references = new vector<reference>;
 		references->push_back(pair{L, std::move(value)});
+	}
+
+	T* get(const MutexedLuaState& mutexed_lua_state)
+	{
+		return get(mutexed_lua_state.lua_state());
 	}
 
 	T* get(lua_State* L)

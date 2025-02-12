@@ -54,42 +54,43 @@ virtual_detour(ProcessLine, App::cCheatManager, App::ICheatManager, bool(const c
 			return original_function(this, pString);
 
 		eastl::string error_message;
-		GetLuaSpore().ExecuteOnMainState([&error_message, pString](sol::state_view s)
+		auto main_state = GetLuaSpore().GetMainLuaState();
+		sol::state_view s = main_state.lua_state();
+
+		constexpr sol::string_view chunk_name = "CheatConsoleInput";
+		constexpr sol::string_view error_prefix = "[string \"CheatConsoleInput\"]:1: ";
+
+		const auto load_result = s.load(sol::string_view(pString), chunk_name.data(), sol::load_mode::text);
+		if (load_result.valid())
 		{
-			constexpr sol::string_view chunk_name = "CheatConsoleInput";
-			constexpr sol::string_view error_prefix = "[string \"CheatConsoleInput\"]:1: ";
-
-
-			const auto load_result = s.load(sol::string_view(pString), chunk_name.data(), sol::load_mode::text);
-			if (!load_result.valid())
-			{
-				const sol::error err = load_result;
-				sol::string_view err_msg = err.what();
-				if (err_msg.substr(0, error_prefix.size()) == error_prefix)
-				{
-					err_msg.remove_prefix(error_prefix.size());
-				}
-				error_message.assign(err_msg.data(), err_msg.size());
-				return;
-			}
-			
 			const auto call_result = sExecuteCheatCommand->call(load_result.get<sol::function>());
-			if (!call_result.valid())
+			if (call_result.valid())
+			{
+				if (sol::optional<sol::string_view> err_msg = call_result)
+				{
+					if (err_msg->substr(0, error_prefix.size()) == error_prefix)
+					{
+						err_msg->remove_prefix(error_prefix.size());
+					}
+					error_message.assign(err_msg->data(), err_msg->size());
+				}
+			}
+			else
 			{
 				const sol::error err = call_result;
 				error_message = err.what();
-				return;
 			}
-
-			if (sol::optional<sol::string_view> err_msg = call_result)
+		}
+		else
+		{
+			const sol::error err = load_result;
+			sol::string_view err_msg = err.what();
+			if (err_msg.substr(0, error_prefix.size()) == error_prefix)
 			{
-				if (err_msg->substr(0, error_prefix.size()) == error_prefix)
-				{
-					err_msg->remove_prefix(error_prefix.size());
-				}
-				error_message.assign(err_msg->data(), err_msg->size());
+				err_msg.remove_prefix(error_prefix.size());
 			}
-		});
+			error_message.assign(err_msg.data(), err_msg.size());
+		}
 
 		if (error_message.empty())
 			return true;

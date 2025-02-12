@@ -50,12 +50,12 @@ virtual_detour(Initialize_detour, App::cPropManager, App::IPropManager, bool())
 
 		if (real_initialize && sOnPropManagerInitialized && sOnPropManagerInitialized->valid())
 		{
-			GetLuaSpore().ExecuteOnAllStates([this](sol::state_view s, bool is_main_state)
+			for (sol::state_view s : GetLuaSpore().GetAllLuaStates())
 			{
 				s["PropManager"] = static_cast<App::IPropManager*>(this);
-				if (!is_main_state) return;
+				if (!GetLuaSpore().IsMainState(s)) continue;
 				std::ignore = sOnPropManagerInitialized->call();
-			});
+			}
 		}
 		return result;
 	}

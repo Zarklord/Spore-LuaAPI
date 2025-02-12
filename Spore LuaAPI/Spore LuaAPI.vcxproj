@@ -220,6 +220,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug DLL|Win32'">Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="SourceCode\GameEvents\InitializePropManager.cpp" />
+    <ClCompile Include="SourceCode\LuaMutex.cpp" />
     <ClCompile Include="SourceCode\lua\luser.cpp" />
     <ClCompile Include="SourceCode\SporeDetours.cpp" />
     <ClCompile Include="SourceCode\LuaSporeCallbacks.cpp" />
@@ -227,6 +228,7 @@
     <ClCompile Include="SourceCode\LuaSpore.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="LuaSpore\LuaMutex.h" />
     <ClInclude Include="LuaSpore\LuaSporeMultiReference.h" />
     <ClInclude Include="LuaSpore\SporeDetours.h" />
     <ClInclude Include="LuaSpore\LuaSporeCallbacks.h" />

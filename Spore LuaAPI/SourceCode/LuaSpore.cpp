@@ -60,33 +60,6 @@ LuaSpore& GetLuaSpore()
 	return LuaSpore::Get();	
 }
 
-LuaSpore::MutexedLuaState::MutexedLuaState(std::mutex* _mutex, lua_State* _state)
-: state(_state)
-, mutex(_mutex)
-{
-}
-
-LuaSpore::MutexedLuaState::~MutexedLuaState()
-{
-	if (mutex)
-		mutex->unlock();	
-}
-
-LuaSpore::MutexedLuaState::MutexedLuaState(MutexedLuaState&& rhs)
-: state(nullptr)
-, mutex(nullptr)
-{
-	*this = std::move(rhs);
-}
-
-LuaSpore::MutexedLuaState& LuaSpore::MutexedLuaState::operator=(MutexedLuaState&& rhs)
-{
-	using std::swap;
-	swap(state, rhs.state);
-	swap(mutex, rhs.mutex);
-	return *this;
-}
-
 int LuaPanic(lua_State* L)
 {
 	ModAPI::Log("LUA: RUN-TIME ERROR %s", lua_tostring(L, -1));
@@ -204,12 +177,12 @@ static auto SporeGetCPPMods()
 	return sol::as_table(LuaSpore::GetCPPMods());
 }
 
-static void SporeRequireOnAllThreads(sol::this_state L, const sol::string_view module)
+static void SporeRequireOnAllThreads(const sol::string_view module)
 {
-	GetLuaSpore().ExecuteOnAllStates([module](sol::state_view s, bool is_main_state)
+	for (sol::state_view s : GetLuaSpore().GetAllLuaStates())
 	{
 		s["require"](module);
-	});
+	}
 }
 
 void lua_deepcopyx(lua_State* source, lua_State* dest, int arg)
@@ -312,7 +285,8 @@ void lua_deepcopy_upvalues(lua_State* source, int source_function, lua_State* de
 static void SporeExecuteOnAllThreads(sol::this_state main_state, const sol::function& fn, sol::variadic_args va)
 {
 	sol::bytecode fn_bytecode = fn.dump();
-	GetLuaSpore().ExecuteOnAllStates([main_state, fn_bytecode, &va](const sol::state_view& s, bool is_main_state)
+
+	for (sol::state_view s : GetLuaSpore().GetAllLuaStates())
 	{
 		lua_getglobal(s, sol::detail::default_handler_name());
 		const int error_handler = lua_gettop(s);
@@ -321,13 +295,13 @@ static void SporeExecuteOnAllThreads(sol::this_state main_state, const sol::func
 		if (x != sol::load_status::ok)
 		{
 			lua_pop(s, 2);
-			return;
+			continue;
 		}
 		lua_deepcopy_upvalues(main_state, 1, s, lua_gettop(s));
 		lua_deepcopy_args(main_state, s, 1, static_cast<int>(va.size()));
 		lua_pcall(s, va.size(), 0, error_handler);
 		lua_remove(s, error_handler);
-	});
+	}
 }
 
 LuaSpore::LuaSpore()
@@ -342,17 +316,17 @@ LuaSpore::LuaSpore()
 	mState.change_gc_mode_incremental(100, 100, 10);
 	mState.stop_gc();
 
-	mThreadStatesMutex.reserve(NumThreadStates);
-	mThreadStates.reserve(NumThreadStates);
-	for (size_t i = 0; i < NumThreadStates; ++i)
+	mThreadStatesMutex.reserve(LuaSporeConfiguration::NumThreadStates);
+	mThreadStates.reserve(LuaSporeConfiguration::NumThreadStates);
+	for (size_t i = 0; i < LuaSporeConfiguration::NumThreadStates; ++i)
 	{
-		mThreadStatesMutex.push_back(new std::mutex);
+		mThreadStatesMutex.push_back(new std::recursive_mutex);
 		mThreadStates.emplace_back(LuaPanic, LuaStateAlloc, this);
 	}
 
 	LocateLuaMods();
 
-	for (size_t i = 0; i < NumThreadStates; ++i)
+	for (size_t i = 0; i < LuaSporeConfiguration::NumThreadStates; ++i)
 	{
 		std::lock_guard lock(*mThreadStatesMutex[i]);
 		InitializeState(mThreadStates[i], false);
@@ -360,7 +334,7 @@ LuaSpore::LuaSpore()
 
 	InitializeState(mState, true);
 
-	for (size_t i = 0; i < NumThreadStates; ++i)
+	for (size_t i = 0; i < LuaSporeConfiguration::NumThreadStates; ++i)
 	{
 		std::lock_guard lock(*mThreadStatesMutex[i]);
 		LuaAPI::LuaPostInitializers::RunCallbacks(mThreadStates[i], false);
@@ -475,14 +449,14 @@ void LuaSpore::InitializeState(sol::state& s, bool is_main_state)
 
 LuaSpore::~LuaSpore()
 {
-	for (size_t i = 0; i < NumThreadStates; ++i)
+	for (size_t i = 0; i < LuaSporeConfiguration::NumThreadStates; ++i)
 	{
 		std::lock_guard lock(*mThreadStatesMutex[i]);
 		LuaAPI::LuaDisposers::RunCallbacks(mThreadStates[i], false);
 	}
 	LuaAPI::LuaDisposers::RunCallbacks(mState, true);
 	
-	for (size_t i = 0; i < NumThreadStates; ++i)
+	for (size_t i = 0; i < LuaSporeConfiguration::NumThreadStates; ++i)
 	{
 		delete mThreadStatesMutex[i];
 	}
@@ -528,61 +502,58 @@ void LuaSpore::Update(double dt)
 	mState.step_gc(0);
 }
 
-bool LuaSpore::CanExecuteOnMainState()
+MutexedLuaState LuaSpore::GetMainLuaState()
 {
-	return IsMainThread();	
+	return {&mStateMutex, mState};
 }
 
-lua_State* LuaSpore::GetMainLuaState() const
+MutexedLuaState LuaSpore::GetFreeLuaState()
 {
-	assert(CanExecuteOnMainState());
-	return mState;
-}
-
-LuaSpore::MutexedLuaState LuaSpore::GetFreeThreadLuaState() const
-{
+	if (IsMainThread())
+	{
+		return GetMainLuaState();
+	}
+	
 	while (true)
 	{
-		for (size_t i = 0; i < NumThreadStates; ++i)
+		for (size_t i = 0; i < LuaSporeConfiguration::NumThreadStates; ++i)
 		{
 			auto* mutex = mThreadStatesMutex[i];
 			if (mutex->try_lock())
 			{
-				return {mutex, mThreadStates[i].lua_state()};
+				return {mutex, mThreadStates[i].lua_state(), MutexedLuaState::lock_already_acquired{}};
 			}
 		}
 		std::this_thread::sleep_for(std::chrono::milliseconds(1));
 	}
 }
 
-void LuaSpore::LockAllThreadStates() const
+MutexedLuaStates LuaSpore::GetAllLuaStates()
 {
-	for (size_t i = 0; i < NumThreadStates; ++i)
+	MutexedLuaStates mutexed_lua_states;
+
+	for (size_t i = 0; i < LuaSporeConfiguration::NumThreadStates; ++i)
 	{
-		mThreadStatesMutex[i]->lock();
-	}
+		mutexed_lua_states.SetState(i + 1, MutexedLuaState{mThreadStatesMutex[i], mThreadStates[i].lua_state()});
+	}	
+	mutexed_lua_states.SetState(0, GetMainLuaState());
+	return mutexed_lua_states;
 }
 
-sol::state* LuaSpore::GetThreadStateArray()
+bool LuaSpore::IsMainState(lua_State* L) const
 {
-	return mThreadStates.data();
-}
-
-void LuaSpore::UnlockThreadState(size_t index) const
-{
-	assert(index < NumThreadStates);
-	mThreadStatesMutex[index]->unlock();
+	return mState.lua_state() == L;
 }
 
 void LuaSpore::LockThreadState(lua_State* L) const
 {
 	if (L == mState)
 	{
-		assert(IsMainThread());
+		mStateMutex.lock();
 		return;
 	}
 
-	for (size_t i = 0; i < NumThreadStates; ++i)
+	for (size_t i = 0; i < LuaSporeConfiguration::NumThreadStates; ++i)
 	{
 		if (L == mThreadStates[i])
 		{
@@ -598,11 +569,11 @@ void LuaSpore::UnlockThreadState(lua_State* L) const
 {
 	if (L == mState)
 	{
-		assert(IsMainThread());
+		mStateMutex.unlock();
 		return;
 	}
 
-	for (size_t i = 0; i < NumThreadStates; ++i)
+	for (size_t i = 0; i < LuaSporeConfiguration::NumThreadStates; ++i)
 	{
 		if (L == mThreadStates[i])
 		{
@@ -626,6 +597,8 @@ bool LuaSpore::DoLuaFile(const sol::string_view file) const
 
 bool LuaSpore::InternalDoLuaFile(sol::string_view file) const
 {
+	std::lock_guard lock(mStateMutex);
+
 	ModAPI::Log("DoLuaFile %.*s.lua", static_cast<int>(file.length()), file.data());
 	
 	const auto& result = mState["require"](file);
@@ -640,12 +613,8 @@ bool LuaSpore::InternalDoLuaFile(sol::string_view file) const
 
 sol::optional<sol::function> LuaSpore::LoadLuaBuffer(sol::string_view package, sol::string_view group, sol::string_view instance)
 {
-	sol::optional<sol::function> result;
-	GetLuaSpore().ExecuteOnMainState([&result, package, group, instance](lua_State* L)
-	{
-		result = InternalLoadLuaBuffer(L, package, group, instance);
-	});
-	return result;
+	auto main_state = GetLuaSpore().GetMainLuaState();
+	return InternalLoadLuaBuffer(main_state.lua_state(), package, group, instance);
 }
 
 sol::optional<sol::function> LuaSpore::InternalLoadLuaBuffer(sol::state_view s, sol::string_view package, sol::string_view group, sol::string_view instance)

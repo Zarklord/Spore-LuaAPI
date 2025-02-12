@@ -19,6 +19,7 @@
     <ClCompile Include="SourceCode\DLL\LuaConsole.cpp" />
     <ClCompile Include="SourceCode\DLL\pch.cpp" />
     <ClCompile Include="SourceCode\lua\luser.cpp" />
+    <ClCompile Include="SourceCode\LuaMutex.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="LuaSpore\Extensions\Property.h" />
@@ -35,5 +36,6 @@
     <ClInclude Include="SourceCode\DLL\targetver.h" />
     <ClInclude Include="SourceCode\DLL\pch.h" />
     <ClInclude Include="SourceCode\lua\luser.h" />
+    <ClInclude Include="LuaSpore\LuaMutex.h" />
   </ItemGroup>
 </Project>

@@ -17,17 +17,44 @@
 * along with Spore LuaAPI.  If not, see <http://www.gnu.org/licenses/>.
 ****************************************************************************/
 
-#pragma once
+#include "pch.h"
 
 #ifdef LUAAPI_DLL_EXPORT
-#define LUAAPI __declspec(dllexport)
-#define LUA_INTERNALPUBLIC public
-#else
-#define LUAAPI __declspec(dllimport)
-#define LUA_INTERNALPUBLIC private
-#endif
 
-struct LuaSporeConfiguration
+#include "LuaSpore/LuaMutex.h"
+
+MutexedLuaState::Impl::Impl(std::recursive_mutex* _mutex, lua_State* _state, lock_already_acquired)
+: mutex(_mutex), state(_state) {}
+
+MutexedLuaState::Impl::Impl(std::recursive_mutex* _mutex, lua_State* _state)
+: Impl(_mutex, _state, lock_already_acquired{})
 {
-	constexpr static size_t NumThreadStates = 2;
-};
+	mutex->lock();
+}
+
+MutexedLuaState::Impl::~Impl()
+{
+	mutex->unlock();
+}
+
+lua_State* MutexedLuaState::Impl::GetState() const
+{
+	return state;	
+}
+
+void MutexedLuaStates::Impl::SetState(size_t index, MutexedLuaState&& mutexed_lua_state)
+{
+	states.at(index) = std::move(mutexed_lua_state);
+}
+
+MutexedLuaState* MutexedLuaStates::Impl::begin()
+{
+	return states.data();
+}
+
+MutexedLuaState* MutexedLuaStates::Impl::end()
+{
+	return states.data() + states.size();
+}
+
+#endif

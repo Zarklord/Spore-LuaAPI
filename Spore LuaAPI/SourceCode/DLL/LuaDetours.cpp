@@ -333,25 +333,21 @@ LuaDetour::~LuaDetour()
 void LuaDetour::ExecuteLuaPreFunction()
 {
 	ZoneScoped;
-	GetLuaSpore().ExecuteOnFreeState([this](lua_State* L)
+	auto free_state = GetLuaSpore().GetFreeLuaState();
+	if (const auto* fn = mLuaPreFunction.get(free_state))
 	{
-		if (const auto* fn = mLuaPreFunction.get(L))
-		{
-			std::ignore = fn->call();
-		}
-	});
+		std::ignore = fn->call();
+	}
 }
 
 void LuaDetour::ExecuteLuaPostFunction()
 {
 	ZoneScoped;
-	GetLuaSpore().ExecuteOnFreeState([this](lua_State* L)
+	auto free_state = GetLuaSpore().GetFreeLuaState();
+	if (const auto* fn = mLuaPostFunction.get(free_state))
 	{
-		if (const auto* fn = mLuaPostFunction.get(L))
-		{
-			std::ignore = fn->call();
-		}
-	});
+		std::ignore = fn->call();
+	}
 }
 
 static void AddLuaDetour(const LuaDetourFunctionInfo function_info, const sol::optional<sol::function>& pre_fn, const sol::optional<sol::function>& post_fn)
