@@ -47,7 +47,7 @@ public:
 		}
 	}
 
-	void set(lua_State* L, T value)
+	void set(lua_State* L, T&& value)
 	{
 		if (!references) references = new vector<reference>;
 		references->push_back(pair{L, std::move(value)});

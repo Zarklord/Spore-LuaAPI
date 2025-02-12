@@ -89,7 +89,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_LIB;TRACY_ENABLE;TRACY_ON_DEMAND;TRACY_IMPORTS;TracyLine=TracyConcat(__LINE__,U);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_LIB;TRACY_ENABLE;TRACY_ON_DEMAND;TRACY_IMPORTS;TRACY_MANUAL_LIFETIME;TRACY_DELAYED_INIT;TracyLine=TracyConcat(__LINE__,U);%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
       <PrecompiledHeaderFile>
       </PrecompiledHeaderFile>
@@ -105,7 +105,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_LIB;TRACY_ENABLE;TRACY_ON_DEMAND;TRACY_EXPORTS;TracyLine=TracyConcat(__LINE__,U);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_LIB;TRACY_ENABLE;TRACY_ON_DEMAND;TRACY_EXPORTS;TRACY_MANUAL_LIFETIME;TRACY_DELAYED_INIT;TracyLine=TracyConcat(__LINE__,U);%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
       <PrecompiledHeaderFile>
       </PrecompiledHeaderFile>
@@ -123,7 +123,7 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <PreprocessorDefinitions>WIN32;NDEBUG;_LIB;TRACY_ENABLE;TRACY_ON_DEMAND;TRACY_IMPORTS;TracyLine=TracyConcat(__LINE__,U);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_LIB;TRACY_ENABLE;TRACY_ON_DEMAND;TRACY_IMPORTS;TRACY_MANUAL_LIFETIME;TRACY_DELAYED_INIT;TracyLine=TracyConcat(__LINE__,U);%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
       <PrecompiledHeaderFile>
       </PrecompiledHeaderFile>
@@ -143,7 +143,7 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <PreprocessorDefinitions>WIN32;NDEBUG;_LIB;TRACY_ENABLE;TRACY_ON_DEMAND;TRACY_EXPORTS;TracyLine=TracyConcat(__LINE__,U);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_LIB;TRACY_ENABLE;TRACY_ON_DEMAND;TRACY_EXPORTS;TRACY_MANUAL_LIFETIME;TRACY_DELAYED_INIT;TracyLine=TracyConcat(__LINE__,U);%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
       <PrecompiledHeaderFile>
       </PrecompiledHeaderFile>

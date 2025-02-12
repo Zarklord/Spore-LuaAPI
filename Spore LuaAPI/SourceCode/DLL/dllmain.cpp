@@ -31,8 +31,6 @@
 void PreInitialize()
 {
 #if defined(LUAAPI_DLL_EXPORT) && defined(_DEBUG)
-	if (!IsDebuggerPresent())
-		ManualBreakpoint();
 	ModAPI::Log("GhidraAddressOffset: 0x%X - 0x400000", baseAddress);
 #endif
 	LuaSpore::Initialize();
@@ -64,6 +62,7 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD  ul_reason_for_call, LPVOID lpReser
 	switch (ul_reason_for_call)
 	{
 	case DLL_PROCESS_ATTACH:
+		tracy::StartupProfiler();
 		TracySetProgramName("Spore: Galactic Adventures (Modded)");
 		ModAPI::AddPostInitFunction(PostInitialize);
 		ModAPI::AddDisposeFunction(Dispose);
@@ -74,7 +73,7 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD  ul_reason_for_call, LPVOID lpReser
 		CommitDetours();
 		break;
 	case DLL_PROCESS_DETACH:
-		*reinterpret_cast<uint32_t*>(GetAddress(Internal, Allocator_ptr)) = NULL;
+		tracy::ShutdownProfiler();
 	case DLL_THREAD_ATTACH:
 	case DLL_THREAD_DETACH:
 		break;

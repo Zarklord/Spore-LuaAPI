@@ -35,11 +35,6 @@ class LuaSpore : App::DefaultMessageListener
 public:
 	LUAAPI [[nodiscard]] static bool CanExecuteOnMainState();
 	LUAAPI [[nodiscard]] lua_State* GetMainLuaState() const;
-	//intentionally not LUAAPI, that way sol::state_view is the mod's version, and not the version in the LuaAPI
-	[[nodiscard]] sol::state_view GetMainState() const
-	{
-		return {GetMainLuaState()};
-	}
 	template <typename ExecuteOnLuaStateFn>
 	void ExecuteOnMainState(const ExecuteOnLuaStateFn fn) const
 	{
@@ -77,17 +72,20 @@ public:
 		output.reset();
 		lua_State* main_state = GetMainLuaState();
 		sol::bytecode fn_bytecode = fn.dump();
+		fn.push();
 		ExecuteOnAllStates([&output, main_state, fn_bytecode](const sol::state_view& s, bool is_main_state)
 		{
+			const int source_function = lua_gettop(main_state);
 			auto x = static_cast<sol::load_status>(luaL_loadbufferx(s, reinterpret_cast<const char*>(fn_bytecode.data()), fn_bytecode.size(), "", sol::to_string(sol::load_mode::any).c_str()));
 			if (x != sol::load_status::ok)
 			{
 				lua_pop(s, 1);
 				return;
 			}
-			lua_deepcopy_upvalues(main_state, 1, s, lua_gettop(s));
+			lua_deepcopy_upvalues(main_state, source_function, s, lua_gettop(s));
 			output.set(s, sol::load_result(s, sol::absolute_index(s, -1), 1, 1, x).get<sol::function>());
 		});
+		fn.pop();
 	}
 
 	LUAAPI bool DoLuaFile(sol::string_view file) const;

@@ -94,20 +94,24 @@ int LuaPanic(lua_State* L)
 	return 0;
 }
 
+const char* TracyLuaAllocName = "Lua";
 void* LuaStateAlloc(void* ud, void* ptr, size_t osize, size_t nsize)
 {
 	if (nsize == 0)
 	{
+		TracyFreeN(ptr, TracyLuaAllocName);
 		delete[] static_cast<char*>(ptr);
 		return nullptr;
 	}
-	void* result = new char[nsize];
+	void* new_ptr = new char[nsize];
+	TracyAllocN(new_ptr, nsize, TracyLuaAllocName);
 	if (ptr)
 	{
-		memcpy(result, ptr, std::min(nsize, osize));
+		memcpy(new_ptr, ptr, std::min(nsize, osize));
+		TracyFreeN(ptr, TracyLuaAllocName);
 		delete[] static_cast<char*>(ptr);
 	}
-	return result;
+	return new_ptr;
 }
 
 EXTERN_C IMAGE_DOS_HEADER __ImageBase; // NOLINT
@@ -177,7 +181,6 @@ static bool SporeLuaExists(const sol::string_view modulename)
 
 static sol::optional<sol::function> SporeLoadLua(sol::this_state L, const sol::string_view modulename)
 {
-	sol::state_view s(L);
 	const auto package_end = modulename.find_first_of(".\\/");
 	const auto group_end = modulename.find_last_of(".\\/");
 
@@ -188,7 +191,7 @@ static sol::optional<sol::function> SporeLoadLua(sol::this_state L, const sol::s
 	const sol::string_view group = modulename.substr(package_end+1, group_end - (package_end+1));
 	const sol::string_view instance = modulename.substr(group_end+1);
 
-	return LuaSpore::InternalLoadLuaBuffer(s, package, group, instance);
+	return LuaSpore::InternalLoadLuaBuffer(L, package, group, instance);
 }
 
 static auto SporeGetPackages()
@@ -286,14 +289,21 @@ void lua_deepcopy_args(lua_State* source, lua_State* dest, int offset, int num_v
 
 void lua_deepcopy_upvalues(lua_State* source, int source_function, lua_State* dest, int dest_function)
 {
-	for (int i = 2; i <= 256; ++i)
+	for (int i = 1; i <= 256; ++i)
 	{
 		const char* source_name = lua_getupvalue(source, source_function, i);
 		if (source_name == nullptr) break;
-		
-		lua_deepcopyx(source, dest, lua_absindex(source, -1));
-		lua_pop(source, 1);
 
+		if (strcmp(source_name, "_ENV") == 0)
+		{
+			lua_pop(source, 1);
+			lua_pushglobaltable(dest);
+		}
+		else
+		{		
+			lua_deepcopyx(source, dest, lua_absindex(source, -1));
+			lua_pop(source, 1);
+		}
 		const char* dest_name = lua_setupvalue(dest, dest_function, i);
 		assert(dest_name != nullptr && strcmp(source_name, dest_name) == 0);
 	}

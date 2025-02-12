@@ -19,63 +19,63 @@
 
 #include "pch.h"
 
-#include "Spore/App/cPropManager.h"
 #ifdef LUAAPI_DLL_EXPORT
 
 #include <LuaSpore/LuaSpore.h>
 #include <LuaSpore/LuaSporeCallbacks.h>
 
+#include <tracy/Tracy.hpp>
+
 #include <asmjit/asmjit.h>
 #include <detours.h>
-
-using namespace asmjit;
-
-namespace LuaCallingConvention
-{
-	enum Type : uint8_t
-	{
-		UNKNOWN		 = 0,
-		__CDECL		 = 1,
-		__CLRCALL	 = 2,
-		__STDCALL	 = 3,
-		__FASTCALL	 = 4,
-		__THISCALL	 = 5,
-		__VECTORCALL = 6,
-	};
-}
+#include <tlhelp32.h>
 
 namespace
 {
-	template <class X, class Y>
-	union horrible_union{
-		X out;
-		Y in;
-	};
+	#ifdef TRACY_ON_DEMAND
+	thread_local uint32_t tracy_counter = 0;
+	thread_local bool tracy_active = false;
+	#endif
 
-	template <class X, class Y>
-	inline X horrible_cast(const Y input){
-		horrible_union<X, Y> u;
-		// Cause a compile-time error if in, out and u are not the same size.
-		// If the compile fails here, it means the compiler has peculiar
-		// unions which would prevent the cast from working.
-		typedef int ERROR_CantUseHorrible_cast[sizeof(Y)==sizeof(u) 
-			&& sizeof(Y)==sizeof(X) ? 1 : -1];
-		u.in = input;
-		return u.out;
+	using namespace tracy;
+	void TracyZonePush(const SourceLocationData* srcloc)
+	{
+#ifdef TRACY_ENABLE
+#ifdef TRACY_ON_DEMAND
+			const auto zone_count = tracy_counter++;
+			if(zone_count != 0 && !tracy_active) return;
+			tracy_active = TracyIsConnected;
+			if(!tracy_active) return;
+#endif
+			TracyQueuePrepare(QueueType::ZoneBegin)
+			MemWrite(&item->zoneBegin.time, Profiler::GetTime());
+			MemWrite(&item->zoneBegin.srcloc, srcloc);
+			TracyQueueCommit(zoneBeginThread);
+#endif
+	}
+
+	using namespace tracy;
+	void TracyZonePop()
+	{
+#ifdef TRACY_ENABLE
+#ifdef TRACY_ON_DEMAND
+		assert(tracy_counter != 0);
+		tracy_counter--;
+		if(!tracy_active) return;
+		if(!TracyIsConnected)
+		{
+			tracy_active = false;
+			return;
+		}
+#endif
+		TracyQueuePrepare(QueueType::ZoneEnd);
+		MemWrite(&item->zoneEnd.time, Profiler::GetTime());
+		TracyQueueCommit(zoneEndThread);
+#endif
 	}
 }
 
-struct LuaDetourFunctionInfo
-{
-	uintptr_t disk_address{};
-	uintptr_t address{};
-	//LuaCallingConvention::Type calling_convention;
-
-	void* GetFunctionPointer() const
-	{
-		return reinterpret_cast<void*>(Address(ModAPI::ChooseAddress(disk_address, address))); //NOLINT
-	}
-};
+using namespace asmjit;
 
 class ModAPILogger : public Logger {
 public:
@@ -89,258 +89,274 @@ public:
 
 	Error _log(const char* data, size_t size = SIZE_MAX) noexcept override
 	{
-		//ModAPI::Log(data);
+		ModAPI::Log(data);
 		return kErrorOk;
 	}
 };
-
 static ModAPILogger mod_api_logger;
+
+struct LuaDetourFunctionInfo
+{
+	uintptr_t disk_address{};
+	uintptr_t address{};
+
+	void* GetFunctionPointer() const
+	{
+		return reinterpret_cast<void*>(Address(ModAPI::ChooseAddress(disk_address, address))); //NOLINT
+	}
+};
 
 class LuaDetour
 {
-private:
-	static void SaveASMRegisters(x86::Assembler& a)
-	{
-		a.push(x86::ebp);
-		a.mov(x86::ebp, x86::esp);
-
-		a.push(x86::eax);
-		a.push(x86::ecx);
-		a.push(x86::edx);
-	}
-	static void LoadASMRegisters(x86::Assembler& a)
-	{
-		a.pop(x86::edx);
-		a.pop(x86::ecx);
-		a.pop(x86::eax);
-
-		a.mov(x86::esp, x86::ebp);
-		a.pop(x86::ebp);
-	}
-
-	class LuaDetourCallInstance
-	{
-	public:
-		LuaDetourCallInstance(const sol::function& fn, uintptr_t return_address, uintptr_t original_function, uintptr_t cleanup_and_ret_function, uintptr_t cleanup_and_jmp_function)
-		{
-			mLuaThread = sol::thread::create(fn.lua_state());
-			mCallInstance = sol::coroutine(mLuaThread.state(), fn);
-
-			const auto imm_this = Imm(reinterpret_cast<uintptr_t>(this));
-
-			CodeHolder code;
-			code.init(mRuntime.environment(), mRuntime.cpuFeatures());
-			code.setLogger(&mod_api_logger);
-			x86::Assembler a(&code);
-
-			{
-				//const bool yielded = this->ExecuteCoroutine();
-				a.mov(x86::ecx, imm_this);
-				a.call(Imm(horrible_cast<uintptr_t>(&LuaDetourCallInstance::ExecuteCoroutine)));
-							
-				Label post_execute = a.newLabel();
-
-				//if (!yielded)
-				a.test(x86::eax, Imm(1));
-				a.jnz(post_execute);
-
-				//jump to cleanup_and_jmp_function address
-				a.mov(x86::eax, Imm(this));
-				a.jmp(Imm(cleanup_and_jmp_function));
-
-				a.bind(post_execute);
-			}
-
-			{
-				LoadASMRegisters(a);
-			
-				//now that we have captured the game return address, remove it from the stack
-				a.add(x86::esp, 4);
-			
-				//call the original function
-				a.call(Imm(original_function));
-				
-				//and undo the removal from the stack
-				a.sub(x86::esp, 4);
-			
-				SaveASMRegisters(a);
-			}
-
-			{
-				//restore the original return address pointer
-				a.mov(x86::dword_ptr_rel(4, x86::ebp), Imm(return_address));
-
-				//this->ExecuteCoroutine();
-				a.mov(x86::ecx, imm_this);
-				a.call(Imm(horrible_cast<uintptr_t>(&LuaDetourCallInstance::ExecuteCoroutine)));
-
-				a.mov(x86::eax, Imm(this));
-				a.jmp(Imm(cleanup_and_ret_function));
-			}
-
-			mRuntime._add(&mJitFunction, &code);
-		}
-
-		~LuaDetourCallInstance()
-		{
-			mRuntime._release(mJitFunction);
-			mJitFunction = nullptr;
-		}
-		
-		LuaDetourCallInstance(const LuaDetourCallInstance&) = delete;
-		LuaDetourCallInstance& operator=(const LuaDetourCallInstance&) = delete;
-		LuaDetourCallInstance(LuaDetourCallInstance&&) = delete;
-		LuaDetourCallInstance& operator=(LuaDetourCallInstance&&) = delete;
-
-		uintptr_t GetJitFunctionAddress() const
-		{
-			return reinterpret_cast<uintptr_t>(mJitFunction);
-		}
-	private:
-		bool ExecuteCoroutine()
-		{
-			sol::state_view s = mLuaThread.lua_state();
-
-			GetLuaSpore().LockThreadState(s);
-			mCallInstance(mLuaThread.state()["coroutine"]["yield"]);
-			GetLuaSpore().UnlockThreadState(s);
-
-			return mCallInstance.runnable();
-		}
-
-		sol::thread mLuaThread;
-		sol::coroutine mCallInstance;
-		void* mJitFunction = nullptr;
-
-		JitRuntime mRuntime;
-	};
-
 public:
-	LuaDetour(LuaDetourFunctionInfo function_info, sol::function fn)
-	: mFunctionInfo(function_info)
-	, mOriginalFunction(mFunctionInfo.GetFunctionPointer())
-	{
-		GetLuaSpore().CopyFunctionToAllStates(fn, mLuaFunction);
+	LuaDetour(LuaDetourFunctionInfo function_info, const sol::optional<sol::function>& pre_fn, const sol::optional<sol::function>& post_fn);
 
-		const auto imm_this = Imm(reinterpret_cast<uintptr_t>(this));
+	~LuaDetour();
 
-		{
-			CodeHolder code;
-			code.init(mRuntime.environment(), mRuntime.cpuFeatures());
-			code.setLogger(&mod_api_logger);
-			x86::Assembler a(&code);
-
-			SaveASMRegisters(a);
-
-			//grab the return address pointer from right behind ebp
-			a.mov(x86::ecx, x86::dword_ptr_rel(4, x86::ebp));
-			a.push(x86::ecx);
-
-			a.mov(x86::ecx, imm_this);
-			a.call(Imm(horrible_cast<uintptr_t>(&LuaDetour::NewLuaDetourCallInstance)));
-
-			a.jmp(x86::eax);
-			
-			mRuntime._add(&mDetourFunction, &code);
-		}
-
-		{
-			CodeHolder code;
-			code.init(mRuntime.environment(), mRuntime.cpuFeatures());
-			code.setLogger(&mod_api_logger);
-			x86::Assembler a(&code);
-
-			a.push(x86::eax); //LuaDetourCallInstance will jump to this instruction with eax set to the this*
-				
-			a.mov(x86::ecx, imm_this);
-			a.call(Imm(horrible_cast<uintptr_t>(&LuaDetour::FreeLuaDetourCallInstance)));
-
-			LoadASMRegisters(a);
-			a.ret();
-
-			mRuntime._add(&mCleanupAndRetFunction, &code);
-		}
-
-		{
-			CodeHolder code;
-			code.init(mRuntime.environment(), mRuntime.cpuFeatures());
-			code.setLogger(&mod_api_logger);
-			x86::Assembler a(&code);
-
-			a.push(x86::eax); //LuaDetourCallInstance will jump to this instruction with eax set to the this*
-				
-			a.mov(x86::ecx, imm_this);
-			a.call(Imm(horrible_cast<uintptr_t>(&LuaDetour::FreeLuaDetourCallInstance)));
-
-			LoadASMRegisters(a);
-			a.jmp(x86::dword_ptr_abs(reinterpret_cast<uintptr_t>(&mOriginalFunction)));
-			
-			mRuntime._add(&mCleanupAndJmpFunction, &code);
-		}
-
-        DetourRestoreAfterWith();
-        DetourTransactionBegin();
-        DetourUpdateThread(GetCurrentThread());
-        DetourAttach(&mOriginalFunction, mDetourFunction);
-        DetourTransactionCommit();
-	}
-
-	~LuaDetour()
-	{
-        DetourTransactionBegin();
-        DetourUpdateThread(GetCurrentThread());
-        DetourDetach(&mOriginalFunction, mDetourFunction);
-        DetourTransactionCommit();
-
-		mRuntime._release(mDetourFunction);
-		mDetourFunction = nullptr;
-
-		mRuntime._release(mCleanupAndRetFunction);
-		mCleanupAndRetFunction = nullptr;
-
-		mRuntime._release(mCleanupAndJmpFunction);
-		mCleanupAndJmpFunction = nullptr;
-	}
-	
 	LuaDetour(const LuaDetour&) = delete;
 	LuaDetour& operator=(const LuaDetour&) = delete;
 	LuaDetour(LuaDetour&&) = delete;
 	LuaDetour& operator=(LuaDetour&&) = delete;
 
-	uintptr_t NewLuaDetourCallInstance(uintptr_t return_address)
-	{
-		LuaDetourCallInstance* lua_detour_call_instance = nullptr;
-		GetLuaSpore().ExecuteOnFreeState([this, &lua_detour_call_instance, return_address](sol::state_view s)
-		{
-			if (auto* fn = mLuaFunction.get(s))
-			{
-				lua_detour_call_instance = new LuaDetourCallInstance(*fn, return_address, reinterpret_cast<uintptr_t>(mOriginalFunction), reinterpret_cast<uintptr_t>(mCleanupAndRetFunction), reinterpret_cast<uintptr_t>(mCleanupAndJmpFunction));
-			}
-		});
-		return lua_detour_call_instance ? lua_detour_call_instance->GetJitFunctionAddress() : 0;
-	}
+	void ExecuteLuaPreFunction();
+	void ExecuteLuaPostFunction();
 
-	void FreeLuaDetourCallInstance(const LuaDetourCallInstance* lua_detour_call_instance) const
-	{
-		assert(lua_detour_call_instance != nullptr);
-		delete lua_detour_call_instance;
-	}
 private:
 	LuaDetourFunctionInfo mFunctionInfo{};
+	
+	LuaMultiReference<sol::function> mLuaPreFunction{};
+	LuaMultiReference<sol::function> mLuaPostFunction{};
 
-	LuaMultiReference<sol::function> mLuaFunction{};
+	size_t mNumLuaDetourCallInstances = 0;
 
 	JitRuntime mRuntime;
 
 	void* mOriginalFunction = nullptr;
-	void* mDetourFunction = nullptr;
-	void* mCleanupAndRetFunction = nullptr;
-	void* mCleanupAndJmpFunction = nullptr;
+	void* mDetourPreFunction = nullptr;
+	void* mDetourPostFunction = nullptr;
 };
 
-static void AddLuaDetour(const LuaDetourFunctionInfo function_info, const sol::function& fn)
+namespace
 {
-	new LuaDetour(function_info, fn);
+	void SaveASMRegisters(x86::Assembler& a)
+	{
+		a.push(x86::eax);
+		a.push(x86::ecx);
+		a.push(x86::edx);
+	}
+	void LoadASMRegisters(x86::Assembler& a)
+	{
+		a.pop(x86::edx);
+		a.pop(x86::ecx);
+		a.pop(x86::eax);
+	}
+
+	void* AddToRuntime(CodeHolder& code, JitRuntime& runtime)
+	{
+		void* func = nullptr;
+		runtime._add(&func, &code);
+		code.reset();
+		return func;
+	}
+
+	uint32_t* AllocPreservationData()
+	{
+		static constexpr SourceLocationData srcloc { "DetourFunctionRunLuaCallback", TracyFunction,  TracyFile, (uint32_t)TracyLine, 0 };
+		TracyZonePush(&srcloc);
+		return new uint32_t[2];
+	}
+
+	void FreePreservationData(const uint32_t* data)
+	{
+		TracyZonePop();
+		delete[] data;
+	}
+	
+	struct DetourFunctionRunLuaCallback
+	{
+		static void* Get(JitRuntime& runtime, bool has_pre, bool has_post, void* this_ptr, void** original_function_ptr)
+		{
+			thread_local CodeHolder code;
+			code.init(runtime.environment(), runtime.cpuFeatures());
+			code.setLogger(&mod_api_logger);
+			x86::Assembler a(&code);
+
+			SaveASMRegisters(a);
+
+			if (has_post)
+			{
+				//uint32_t* eax = AllocPreservationData()
+				a.call(Imm(AllocPreservationData));
+
+				//preserve original return address
+				a.mov(x86::edx, x86::esp);
+				a.mov(x86::ecx, x86::dword_ptr_rel(12, x86::edx));
+				a.mov(x86::dword_ptr_rel(0, x86::eax), x86::ecx);
+
+				//preserve ebp
+				a.mov(x86::dword_ptr_rel(4, x86::eax), x86::ebp);
+				a.mov(x86::ebp, x86::eax);
+			}
+
+			if (has_pre)
+			{
+				//this->ExecuteLuaPreFunction();
+				a.mov(x86::ecx, Imm(this_ptr));
+				a.call(Imm(union_cast<uintptr_t>(&LuaDetour::ExecuteLuaPreFunction)));
+			}
+
+			LoadASMRegisters(a);
+
+			if (!has_post)
+			{
+				a.jmp(x86::dword_ptr_abs(reinterpret_cast<uint64_t>(original_function_ptr)));
+				return AddToRuntime(code, runtime);
+			}
+
+			a.add(x86::esp, 4); //add 4 back to the stack pointer so that call will use our return address
+
+			a.call(x86::dword_ptr_abs(reinterpret_cast<uint64_t>(original_function_ptr)));
+
+			a.sub(x86::esp, 4); //sub 4 to the stack pointer so we have room to inject a new return address
+
+			SaveASMRegisters(a);
+			
+			a.mov(x86::ecx, Imm(this_ptr));
+			a.call(Imm(union_cast<uintptr_t>(&LuaDetour::ExecuteLuaPostFunction)));
+
+			//restore ebx
+			a.mov(x86::eax, x86::ebp);
+			a.mov(x86::ebp, x86::dword_ptr_rel(4, x86::eax));
+
+			//restore original return address;
+			a.mov(x86::ecx, x86::dword_ptr_rel(0, x86::eax));
+			a.mov(x86::edx, x86::esp);
+			a.mov(x86::dword_ptr_rel(12, x86::edx), x86::ecx);
+
+			//FreePreservationData(eax)
+			a.push(x86::eax);
+			a.call(Imm(FreePreservationData));
+			a.add(x86::esp, 4);
+
+			LoadASMRegisters(a);
+
+			a.ret();
+
+			return AddToRuntime(code, runtime);
+		}
+	};
+}
+
+static vector<HANDLE> GetAllThreadHandles()
+{
+	vector<HANDLE> handles;
+	handles.reserve(8);
+
+	HANDLE h = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
+	if (h != INVALID_HANDLE_VALUE)
+	{
+		DWORD pid = GetCurrentProcessId();
+		DWORD tid = GetCurrentThreadId();
+		THREADENTRY32 te;
+		te.dwSize = sizeof(te);
+		if (Thread32First(h, &te))
+		{
+			do {
+				if (te.th32OwnerProcessID == pid && te.th32ThreadID != tid) {
+					HANDLE hThread = OpenThread(THREAD_SUSPEND_RESUME, false, te.th32ThreadID);
+					handles.push_back(hThread);
+				}
+				te.dwSize = sizeof(te);
+			} while (Thread32Next(h, &te));
+		}
+		CloseHandle(h);
+	}
+
+	return handles;
+}
+
+static void CloseAllThreadHandles(vector<HANDLE>& handles)
+{
+	for (const HANDLE handle : handles)
+	{
+		CloseHandle(handle);
+	}
+	handles.clear();
+}
+
+static void DetourUpdateThreads(vector<HANDLE>& handles)
+{
+	for (const HANDLE handle : handles)
+	{
+		DetourUpdateThread(handle);
+	}
+}
+
+LuaDetour::LuaDetour(LuaDetourFunctionInfo function_info, const sol::optional<sol::function>& pre_fn, const sol::optional<sol::function>& post_fn)
+: mFunctionInfo(function_info)
+, mOriginalFunction(mFunctionInfo.GetFunctionPointer())
+{
+
+	const bool has_pre = pre_fn.has_value();
+	const bool has_post = post_fn.has_value();
+
+	if (has_pre)
+		GetLuaSpore().CopyFunctionToAllStates(pre_fn.value(), mLuaPreFunction);
+
+	if (has_post)
+		GetLuaSpore().CopyFunctionToAllStates(post_fn.value(), mLuaPostFunction);
+
+	mDetourPreFunction = DetourFunctionRunLuaCallback::Get(mRuntime, has_pre, has_post, this, &mOriginalFunction);
+
+	DetourRestoreAfterWith();
+	DetourTransactionBegin();
+	auto handles = GetAllThreadHandles();
+	DetourUpdateThreads(handles);
+	DetourAttach(&mOriginalFunction, mDetourPreFunction);
+	DetourTransactionCommit();
+	CloseAllThreadHandles(handles);
+}
+
+LuaDetour::~LuaDetour()
+{
+	DetourTransactionBegin();
+	auto handles = GetAllThreadHandles();
+	DetourUpdateThreads(handles);
+	DetourDetach(&mOriginalFunction, mDetourPreFunction);
+	DetourTransactionCommit();
+	CloseAllThreadHandles(handles);
+
+	mRuntime._release(mDetourPreFunction);
+	mDetourPreFunction = nullptr;
+}
+
+void LuaDetour::ExecuteLuaPreFunction()
+{
+	ZoneScoped;
+	GetLuaSpore().ExecuteOnFreeState([this](lua_State* L)
+	{
+		if (const auto* fn = mLuaPreFunction.get(L))
+		{
+			std::ignore = fn->call();
+		}
+	});
+}
+
+void LuaDetour::ExecuteLuaPostFunction()
+{
+	ZoneScoped;
+	GetLuaSpore().ExecuteOnFreeState([this](lua_State* L)
+	{
+		if (const auto* fn = mLuaPostFunction.get(L))
+		{
+			std::ignore = fn->call();
+		}
+	});
+}
+
+static void AddLuaDetour(const LuaDetourFunctionInfo function_info, const sol::optional<sol::function>& pre_fn, const sol::optional<sol::function>& post_fn)
+{
+	new LuaDetour(function_info, pre_fn, post_fn);
 }
 
 OnLuaInit(sol::state_view s, bool is_main_state)
