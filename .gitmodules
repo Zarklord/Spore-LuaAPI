@@ -1,3 +1,6 @@
 [submodule "tracy/tracy"]
 	path = tracy/tracy
 	url = https://github.com/wolfpld/tracy.git
+[submodule "asmjit/asmjit"]
+	path = asmjit/asmjit
+	url = https://github.com/asmjit/asmjit.git
