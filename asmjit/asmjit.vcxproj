@@ -173,6 +173,9 @@
     <ClCompile Include="asmjit\src\asmjit\x86\x86operand.cpp" />
     <ClCompile Include="asmjit\src\asmjit\x86\x86rapass.cpp" />
   </ItemGroup>
+  <ItemGroup>
+    <Natvis Include="asmjit\src\asmjit.natvis" />
+  </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
