@@ -212,11 +212,12 @@
     <ClCompile Include="SourceCode\Bindings\PropManager.cpp" />
     <ClCompile Include="SourceCode\DLL\dllmain.cpp" />
     <ClCompile Include="SourceCode\DLL\LuaConsole.cpp" />
-    <ClCompile Include="SourceCode\DLL\LuaDetours.cpp" />
+    <ClCompile Include="SourceCode\LuaDetours\LuaDetour.cpp" />
     <ClCompile Include="SourceCode\DLL\pch.cpp">
       <PrecompiledHeader>Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="SourceCode\GameEvents\InitializePropManager.cpp" />
+    <ClCompile Include="SourceCode\LuaDetours\LuaDetourBindings.cpp" />
     <ClCompile Include="SourceCode\LuaMutex.cpp" />
     <ClCompile Include="SourceCode\lua\luser.cpp" />
     <ClCompile Include="SourceCode\SporeDetours.cpp" />
@@ -234,11 +235,14 @@
     <ClInclude Include="LuaSpore\LuaInternal.h" />
     <ClInclude Include="LuaSpore\LuaSpore.h" />
     <ClInclude Include="LuaSpore\SolExtensions.h" />
+    <ClInclude Include="LuaSpore\TracyUtil.h" />
     <ClInclude Include="sol\config.hpp" />
     <ClInclude Include="sol\forward.hpp" />
     <ClInclude Include="sol\sol.hpp" />
     <ClInclude Include="SourceCode\DLL\pch.h" />
     <ClInclude Include="SourceCode\DLL\targetver.h" />
+    <ClInclude Include="SourceCode\LuaDetours\DetourHelper.h" />
+    <ClInclude Include="SourceCode\LuaDetours\LuaDetour.h" />
     <ClInclude Include="SourceCode\lua\luser.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

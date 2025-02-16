@@ -31,7 +31,7 @@ LUAAPI void lua_deepcopyx(lua_State* source, lua_State* dest, int arg);
 LUAAPI void lua_deepcopy_args(lua_State* source, lua_State* dest, int offset, int num_values);
 LUAAPI void lua_deepcopy_upvalues(lua_State* source, int source_function, lua_State* dest, int dest_function);
 
-class LuaSpore : App::DefaultMessageListener
+class LuaSpore : public App::IUnmanagedMessageListener
 {
 public:
 	LUAAPI static bool IsMainThread();
@@ -94,9 +94,6 @@ LUA_INTERNALPUBLIC:
 	
 	void PostInit();
 
-	void StartUpdating();
-	void StopUpdating();
-	
 	virtual bool HandleMessage(uint32_t messageID, void* pMessage) override;
 public:
 	LuaSpore(const LuaSpore&) = delete;
@@ -167,3 +164,4 @@ private:
 };
 
 extern LUAAPI LuaSpore& GetLuaSpore();
+extern LUAAPI bool LuaSporeExists();

@@ -22,6 +22,7 @@
 #ifdef LUAAPI_DLL_EXPORT
 
 #include <LuaSpore/LuaSpore.h>
+#include <SourceCode/LuaDetours/DetourHelper.h>
 
 #include "tracy/Tracy.hpp"
 
@@ -45,6 +46,7 @@ void PostInitialize()
 void Dispose()
 {
 	LuaSpore::Finalize();
+	tracy::ShutdownProfiler();
 }
 
 member_detour(PreInit_detour, std::monostate, int(int, int))
@@ -66,16 +68,17 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD  ul_reason_for_call, LPVOID lpReser
 		TracySetProgramName("Spore: Galactic Adventures (Modded)");
 		ModAPI::AddPostInitFunction(PostInitialize);
 		ModAPI::AddDisposeFunction(Dispose);
-
-		PrepareDetours(hModule);
+		
+		DetourTransactionBegin();
 		PreInit_detour::attach(GetAddress(App::cAppSystem, PreInit));
 		LuaSpore::RegisterCPPMod(LUAAPI_MODNAME, LUAAPI_VERSION);
-		CommitDetours();
+		DetourTransactionCommit();
 		break;
-	case DLL_PROCESS_DETACH:
-		tracy::ShutdownProfiler();
 	case DLL_THREAD_ATTACH:
+		detour_thread_manager.AddThread(GetCurrentThreadId());
+		break;
 	case DLL_THREAD_DETACH:
+		detour_thread_manager.RemoveThread(GetCurrentThreadId());
 		break;
 	}
 	return TRUE;

@@ -36,13 +36,11 @@
 void LuaSpore::Initialize()
 {
 	new LuaSpore();
-	sInstance->AddRef();
 }
 
 void LuaSpore::Finalize()
 {
-	sInstance->StopUpdating();
-	sInstance->Release();
+	delete sInstance;
 }
 
 LuaSpore& LuaSpore::Get()
@@ -58,6 +56,11 @@ bool LuaSpore::Exists()
 LuaSpore& GetLuaSpore()
 {
 	return LuaSpore::Get();	
+}
+
+bool LuaSporeExists()
+{
+	return LuaSpore::Exists();
 }
 
 int LuaPanic(lua_State* L)
@@ -449,6 +452,8 @@ void LuaSpore::InitializeState(sol::state& s, bool is_main_state)
 
 LuaSpore::~LuaSpore()
 {
+	MessageManager.RemoveListener(this, App::kMsgAppUpdate);
+
 	for (size_t i = 0; i < LuaSporeConfiguration::NumThreadStates; ++i)
 	{
 		std::lock_guard lock(*mThreadStatesMutex[i]);
@@ -465,19 +470,9 @@ LuaSpore::~LuaSpore()
 
 void LuaSpore::PostInit()
 {
-	StartUpdating();
-}
-
-void LuaSpore::StartUpdating()
-{
-	MessageManager.AddListener(this, App::kMsgAppUpdate);
+	MessageManager.AddUnmanagedListener(this, App::kMsgAppUpdate);
 	mUpdateClock.Reset();
 	mUpdateClock.Start();
-}
-
-void LuaSpore::StopUpdating()
-{
-	MessageManager.RemoveListener(this, App::kMsgAppUpdate);
 }
 
 bool LuaSpore::HandleMessage(uint32_t messageID, void* pMessage)
@@ -531,12 +526,12 @@ MutexedLuaState LuaSpore::GetFreeLuaState()
 MutexedLuaStates LuaSpore::GetAllLuaStates()
 {
 	MutexedLuaStates mutexed_lua_states;
-
+	//main state always goes last
+	mutexed_lua_states.SetState(LuaSporeConfiguration::NumThreadStates, GetMainLuaState());
 	for (size_t i = 0; i < LuaSporeConfiguration::NumThreadStates; ++i)
 	{
-		mutexed_lua_states.SetState(i + 1, MutexedLuaState{mThreadStatesMutex[i], mThreadStates[i].lua_state()});
-	}	
-	mutexed_lua_states.SetState(0, GetMainLuaState());
+		mutexed_lua_states.SetState(i, MutexedLuaState{mThreadStatesMutex[i], mThreadStates[i].lua_state()});
+	}
 	return mutexed_lua_states;
 }
 
